@@ -14,9 +14,21 @@ class GaussianKernel(object):
     def __init__(self,scale):
         self.scale=scale
 
+
     def Eval(self,x):
         scaled = [xi ** 2 / (2 * self.scale ** 2) for xi in x]
         return np.exp(-sum(scaled))
+
+#    @property
+#    def Eval(self):
+#        ker = self
+#        class ComputeEval(object):
+#            def __init__(self):
+#                self.scale=ker.scale
+#            def Ev(self,x):
+#                scaled = [xi ** 2 / (2 * self.scale ** 2) for xi in x]
+#                return np.exp(-sum(scaled))
+#        return ComputeEval
 
     @property
     def derivative(self):
@@ -32,5 +44,9 @@ class GaussianKernel(object):
 
 
     def gradient(self,x0):
-        a=self.Eval(x0)
-        return -(1/(self.scale ** 2))*a*x0
+        #a=self.Eval(x0)
+        scaled = [xi ** 2 / (2 * self.scale ** 2) for xi in x0]
+        return [-(1/(self.scale ** 2))*np.exp(-sum(scaled))*xi for xi in x0]
+
+
+

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Fri May 12 11:52:08 2017
+
+@author: bgris
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Thu Apr  6 16:16:55 2017
 
 @author: bgris
@@ -18,6 +26,83 @@ from DeformationModulesODL.deform import UnconstrainedAffine
 from DeformationModulesODL.deform import LocalScaling
 from DeformationModulesODL.deform import LocalRotation
 from DeformationModulesODL.deform import TemporalAttachmentModulesGeom
+
+import scipy
+
+
+
+def compute_grid_deformation(vector_fields_list, time_step, initial_grid):
+    vector_fields_list = vector_fields_list
+    nb_time_points = vector_fields_list.size
+
+    grid_points = initial_grid
+
+    for t in range(nb_time_points):
+        velocity = np.empty_like(grid_points)
+        for i, vi in enumerate(vector_fields_list[t]):
+            velocity[i, ...] = vi.interpolation(grid_points)
+        grid_points += time_step*velocity
+
+    return grid_points
+
+
+def compute_grid_deformation_list(vector_fields_list, time_step, initial_grid):
+    vector_fields_list = vector_fields_list
+    nb_time_points = vector_fields_list.size
+    grid_list=[]
+    grid_points=initial_grid.copy()
+    grid_list.append(initial_grid)
+
+    for t in range(nb_time_points):
+        velocity = np.empty_like(grid_points)
+        for i, vi in enumerate(vector_fields_list[t]):
+            velocity[i, ...] = vi.interpolation(grid_points)
+        grid_points += time_step*velocity
+        grid_list.append(grid_points.copy())
+
+    return grid_list
+
+
+# As previously but check if points of the grids are in the
+# Domain and if they are not the velocity is equal to zero
+def compute_grid_deformation_list_bis(vector_fields_list, time_step, initial_grid):
+    vector_fields_list = vector_fields_list
+    nb_time_points = vector_fields_list.size
+    grid_list=[]
+    grid_points=initial_grid.T.copy()
+    grid_list.append(initial_grid.T)
+    mini=vector_fields_list[0].space[0].min_pt
+    maxi=vector_fields_list[0].space[0].max_pt
+    for t in range(nb_time_points):
+        print(t)
+        velocity = np.zeros_like(grid_points)
+        for i, vi in enumerate(vector_fields_list[t]):
+            for k in range(len(initial_grid.T)):
+                isindomain=1
+                point=grid_points[k]
+                for u in range(len(mini)):
+                    if (point[u]<mini[u] or point[u]>maxi[u] ):
+                        isindomain=0
+                if (isindomain==1):
+                    velocity[k][i] = vi.interpolation(point)
+
+        grid_points += time_step*velocity
+        grid_list.append(grid_points.copy().T)
+
+    return grid_list
+
+
+def plot_grid(grid, skip):
+    for i in range(0, grid.shape[1], skip):
+        plt.plot(grid[0, i, :], grid[1, i, :], 'r', linewidth=0.5)
+
+    for i in range(0, grid.shape[2], skip):
+        plt.plot(grid[0, :, i], grid[1, :, i], 'r', linewidth=0.5)
+
+
+
+#
+
 
 #%% Generate data
 
@@ -55,15 +140,24 @@ space = odl.uniform_discr(
 ground_truth =space.element(I1)
 
 
+I0=space.element(I0)
+I1=space.element(I1)
+
+
 # Create the template as the given image
 template = space.element(I0)
 
 
+##### Cas shepp logan
+space = odl.uniform_discr(
+    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
+    dtype='float32', interp='linear')
+
+template= odl.phantom.shepp_logan(space)
+template.show(clim=[1,1.1])
 
 
 
-I0=space.element(I0)
-I1=space.element(I1)
 # Give the number of directions
 num_angles = 10
 
@@ -85,30 +179,110 @@ forward_op=odl.IdentityOperator(space)
 
 
 
+#
+#
+## Give the number of directions
+#num_angles = 10
+#
+## Create the uniformly distributed directions
+#angle_partition = odl.uniform_partition(0.0, np.pi, num_angles,
+#                                    nodes_on_bdry=[(True, True)])
+#
+## Create 2-D projection domain
+## The length should be 1.5 times of that of the reconstruction space
+#detector_partition = odl.uniform_partition(-24, 24, int(round(space.shape[0]*np.sqrt(2))))
+#
+## Create 2-D parallel projection geometry
+#geometry = odl.tomo.Parallel2dGeometry(angle_partition, detector_partition)
+#
+## Ray transform aka forward projection. We use ASTRA CUDA backend.
+#forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
+#
+#
 
 
-# Give the number of directions
-num_angles = 10
+space = odl.uniform_discr(
+    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
+    dtype='float32', interp='linear')
 
-# Create the uniformly distributed directions
-angle_partition = odl.uniform_partition(0.0, np.pi, num_angles,
-                                    nodes_on_bdry=[(True, True)])
-
-# Create 2-D projection domain
-# The length should be 1.5 times of that of the reconstruction space
-detector_partition = odl.uniform_partition(-24, 24, int(round(space.shape[0]*np.sqrt(2))))
-
-# Create 2-D parallel projection geometry
-geometry = odl.tomo.Parallel2dGeometry(angle_partition, detector_partition)
-
-# Ray transform aka forward projection. We use ASTRA CUDA backend.
-forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
+template= odl.phantom.shepp_logan(space)
+#template.show(clim=[1,1.1])
 
 
+template=template.space.element(scipy.ndimage.filters.gaussian_filter(template.asarray(),1.5))
+
+
+NRotation=1
+space_mod = odl.uniform_discr(
+    min_pt=[-16, -16], max_pt=[16, 16], shape=[256, 256],
+    dtype='float32', interp='nearest')
+
+kernelrot=Kernel.GaussianKernel(1.5)
+rotation=LocalRotation.LocalRotation(space_mod, NRotation, kernelrot)
+
+GD=rotation.GDspace.element([[-0.0500, -9.5]])
+Cont=rotation.Contspace.element([1])
+
+#I1=template.copy()
+#inv_N=1
+#for i in range(5):
+#    vect_field=rotation.ComputeField(GD,Cont).copy()
+#    I1=template.space.element(
+#                odl.deform.linearized._linear_deform(I1,
+#                               -inv_N * vect_field)).copy()
+#
+#I1.show(clim=[1 , 1.1])
+#
+
+ellipses= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
+            [-.98, .6624, .8740, 0.0000, -.0184, 0],
+            [-.2, .1100, .3100, 0.2200, 0.0000, -18],
+            [-.2, .1600, .4100, -.2200, 0.0000, 18],
+            [0.1, .2100, .2500, 0.0000, 0.3500, 0],
+            [0.1, .0460, .0460, 0.0000, 0.1000, 0],
+            [0.1, .0460, .0460, 0.0000, -.1000, 0],
+            [0.8, .0460, .0230, -.0800, -.6050, 0],
+            [0.8, .0230, .0230, 0.0000, -.6060, 0],
+            [0.8, .0230, .0460, 0.0600, -.6050, 0]]
+
+
+ellipses1= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
+            [-.98, .6624, .8740, 0.0000, -.0184, 0],
+            [-.2, .1100, .3100, 0.2200, 0.0000, -18],
+            [-.2, .1600, .4100, -.2200, 0.0000, 18],
+            [0.1, .2100, .2500, 0.0000, 0.3500, 0],
+            [0.1, .0460, .0460, 0.0000, 0.1000, 0],
+            [0.1, .0460, .0460, 0.0000, -.1000, 0],
+            [0.8, .0460, .0230, -.06500, -0.6550, 45],
+            [0.8, .0230, .0230, 0.0000, -.6060, 0],
+            [0.8, .0230, .0460, 0.0400, -.5550, 45]]
+
+
+ellipses1= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
+            [-.98, .6624, .8740, 0.0000, -.0184, 0],
+            [-.2, .1100, .3100, 0.2200, 0.0000, -18],
+            [-.2, .1600, .4100, -.2200, 0.0000, 18],
+            [0.1, .2100, .2500, 0.0000, 0.3500, 0],
+            [0.1, .0460, .0460, 0.0000, 0.1000, 0],
+            [0.1, .0460, .0460, 0.0000, -.1000, 0],
+            [0.8, .0460, .0230, -0.01, -0.670, 80],
+            [0.8, .0230, .0230, 0.0000, -.6060, 0],
+            [0.8, .0230, .0460, 0.01, -.560, 80]]
 
 
 
 
+phantom=odl.phantom.geometric.ellipsoid_phantom(space,ellipses)
+#phantom.show()
+
+template=template.space.element(scipy.ndimage.filters.gaussian_filter(phantom.asarray(),1.5))
+
+I1=odl.phantom.geometric.ellipsoid_phantom(space,ellipses1)
+#I1.show(clim=[1 , 1.1])
+I1=template.space.element(scipy.ndimage.filters.gaussian_filter(I1.asarray(),1.5))
+
+template.show()
+I1.show()
 
 # Create projection data by calling the ray transform on the phantom
 proj_data = forward_op(I1)
@@ -124,7 +298,7 @@ dim=2
 Ntrans=1
 NAffine=2
 NScaling=3
-NRotation=2
+NRotation=1
 ##
 #miniX=-5
 #maxiX=5
@@ -150,20 +324,41 @@ affine=UnconstrainedAffine.UnconstrainedAffine(space_mod, NAffine, kernelaff)
 
 #scaling=LocalScaling.LocalScaling(space_mod, NScaling, kernel)
 
-kernelrot=Kernel.GaussianKernel(5)
+kernelrot=Kernel.GaussianKernel(3)
 rotation=LocalRotation.LocalRotation(space_mod, NRotation, kernelrot)
 
 #Module=DeformationModuleAbstract.Compound([translation,rotation])
-Module=DeformationModuleAbstract.Compound([translation])
+Module=DeformationModuleAbstract.Compound([rotation])
 #ModuleF=translationF
 #Module=affine
 #Module=DeformationModuleAbstract.Compound([translation,translation])
 
+#%%
+nb_time_point_int=10
+GD=Module.GDspace.element([[[-0.5,-10]]])
+Cont=5*odl.ProductSpace(Module.Contspace,nb_time_point_int+1).one()
 
+X=functional_mod.domain.element([GD,Cont].copy())
+
+vector_fields_list=energy_op_lddmm.domain.zero()
+
+I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
+I_t[0].show()
+I_t[nb_time_point_int].show()
+I1=I_t[nb_time_point_int].copy()
+
+GD_affine=affine.GDspace.element([[-2,-4],[3,4]])
+Cont_affine=-1*affine.Contspace.element([[[1,0],[1,-1],[0,1]],[[-1,0.5],[-1,0],[0.5,0]]])
+vect_field_affine=affine.ComputeField(GD_affine,Cont_affine)
+
+I1=odl.deform.linearized._linear_deform(I_t[nb_time_point_int],vect_field_affine)
+I1=template.space.element(I1)
+I1.show()
+template.show()
 #%% Define functional
 lam=0.01
 nb_time_point_int=10
-template=I0
+#template=I0
 
 
 ##data_time_points=np.array([0,0.5,0.8,1])
@@ -181,271 +376,216 @@ template=I0
 #              (image_N0[0]),(image_N0[10]),
 #              (image_N0[0]),(image_N0[10])]
 
+lamb0=1e-7
+lamb1=1e-4
+import scipy
 data_time_points=np.array([1])
 data_space=odl.ProductSpace(forward_op.range,data_time_points.size)
-data=data_space.element([proj_data])
+data=data_space.element([forward_op(I1)])
 forward_operators=[forward_op]
 data_image=[I1]
 
 
 Norm=odl.solvers.L2NormSquared(forward_op.range)
 
+functional_mod = TemporalAttachmentModulesGeom.FunctionalModulesGeom(lamb0, nb_time_point_int, template, data, data_time_points, forward_operators,Norm, Module)
 
 
-functional = TemporalAttachmentModulesGeom.FunctionalModulesGeom(lam, nb_time_point_int, template, data, data_time_points, forward_operators,Norm, Module)
-#functionalF = TemporalAttachmentModulesGeom.FunctionalModulesGeom(lam, nb_time_point_int, template, data, data_time_points, forward_operators,Norm, ModuleF)
-#GD_init=Module.GDspace.element([[[0,0]],[[0,-5],[0,5]]])
-GD_init=Module.GDspace.element([[[-10,15]]])
-#GD_init=Module.GDspace.element([[-4,0], [-2,0], [0,0], [2,0], [4,0],[-4,2], [-2,2], [0,2], [2,2], [4,2],[-4,4], [-2,4], [0,4], [2,4], [4,4],[-4,-2], [-2,-2], [0,-2], [2,-2], [4,-2],[-4,-4], [-2,-4], [0,-4], [2,-4], [4,-4]])
-Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
-#%% Initial parameter
-mini=-16
-#maxi=16
-#nbsq=20
+
+# The parameter for kernel function
+sigma = 0.5
+
+# Give kernel function
+def kernel_lddmm(x):
+    scaled = [xi ** 2 / (2 * sigma ** 2) for xi in x]
+    return np.exp(-sum(scaled))
+
+
+# Define energy operator
+energy_op_lddmm=odl.deform.TemporalAttachmentLDDMMGeom(nb_time_point_int, template ,data,
+                            data_time_points, forward_operators,Norm, kernel_lddmm,
+                            domain=None)
+
+
+Reg=odl.deform.RegularityLDDMM(kernel_lddmm,energy_op_lddmm.domain)
+
+functional_lddmm=energy_op_lddmm + lamb1*Reg
+
+
+def Mix_vect_field(vect_field_list,GD_init,Cont):
+    space_pts=template.space.points()
+    GD=GD_init.copy()
+    vect_field_list_tot=vect_field_list.copy()
+    for i in range(nb_time_point_int):
+        vect_field_list_mod=functional_mod.Module.ComputeField(GD,Cont[i]).copy()
+        vect_field_list_mod_interp=template.space.tangent_bundle.element([vect_field_list_mod[u].interpolation(space_pts.T) for u in range(dim)]).copy()
+        vect_field_list_tot[i]+=vect_field_list_mod_interp.copy()
+        GD+=(1/nb_time_point_int)*functional_mod.Module.ApplyVectorField(GD,vect_field_list_tot[i]).copy()
+
+    return vect_field_list_tot
+
+def Shoot_mixt(vect_field_list,GD,Cont):
+    vect_field_list_mod=Mix_vect_field(vect_field_list,GD,Cont).copy()
+    I=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_list_mod, template)
+    return I
+
+def attach_tot(vect_field_list,GD,Cont):
+    I=Shoot_mixt(vect_field_list,GD,Cont)
+    return Norm(forward_operators[0](I[nb_time_point_int])-data[0])
+
+
+
+def grad_attach_vector_field(vect_field_list,GD,Cont):
+    vect_field_list_tot=Mix_vect_field(vect_field_list,GD,Cont)
+    grad=energy_op_lddmm.gradient(vect_field_list_tot).copy()
+    return grad
 #
+
+def ComputeGD_mixt(vect_field_list,GD,Cont):
+    GD_list=[]
+    GD_list.append(GD.copy())
+    vect_field_list_mixt=Mix_vect_field(vect_field_list,GD_init,Cont)
+    for i in range(nb_time_point_int):
+        GD_temp=GD_list[i].copy()
+        GD_temp+=(1/nb_time_point_int)*functional_mod.Module.ApplyVectorField(GD_temp,vect_field_list_mixt[i])
+        GD_list.append(GD_temp.copy())
+
+    return GD_list.copy()
 #
+
+
+def ComputeModularVectorFields(vect_field_list,GD,Cont):
+    GD_list=ComputeGD_mixt(vect_field_list,GD,Cont)
+    vect_field_list_tot=[]
+    for i in range(nb_time_point_int+1):
+        vect_field_list_tot.append(functional_mod.Module.ComputeField(GD_list[i],Cont[i]))
+
+    return vect_field_list_tot
 #
-#ec=(maxi-mini)/nbsq
-#GD_init=Module.GDspace.element()
-#cont=0
-#for i in range(nbsq):
-#    for j in range(nbsq):
-#      GD_init[cont]=odl.rn(2).element([mini+(i+0.5)*ec, mini+(j+0.5)*ec])
-#      cont+=1
-#
-#GD_init=Module.GDspace.element([[0,-7],[0,0],[0,7]])
-#GD_init=Module.GDspace.element([[0,-7.5],[0,-4.5],[0,-1.5],[0,1.5],[0,4.5],[0,7.5]])
-#GD_init=Module.GDspace.element([[0,0]])
-#Cont=Module.basisCont[0]+2*Module.basisCont[11]
-GD_init=Module.GDspace.element([[[0,5],[0,-5]],[[0,0]]])
-#GD_init=Module.GDspace.element([[[0,0]]])
-#%%
 
-import random
-Cont=Module.basisCont[0]+2*Module.basisCont[1]
-Cont=Module.Contspace.zero()
-for i in range(len(Module.basisCont)):
-    Cont+=(random.gauss(0,1)*Module.basisCont[i]).copy()
-
-#%%
-vectField=Module.ComputeField(GD_init,Cont)
-vectFieldF=ModuleF.ComputeField(GD_init,Cont)
-
-
-#%%
-grad=functional.gradient([GD_init,Cont_init])
-#%%
-energy=functional([GD_init,Cont_init])
-energy=functionalF([GD_init,Cont_init])
-
-#%%
-A=Module.ComputeFieldDer(GD_init,Cont)(GD_init)
-B=ModuleF.ComputeFieldDer(GD_init,Cont)(GD_init)
-#%%
-
-import timeit
-
-start = timeit.default_timer()
-#energy=functional([GD_init,Cont_init])
-for i in range(220):
-    traj=functional([GD_init,Cont_init])
-    print(i)
-
-
-#vectField=Module.ComputeField(GD_init,Cont)
-#speed=Module.ApplyVectorField(GD_init,vectField)
-#Module.Cost(GD_init,Cont)
-#A=Module.ComputeFieldDer(GD_init,Cont)(GD_init)
-#op=Module.ApplyModule(ModuleF,GD_init,Cont)
-#A=op(GD_init)
-#Module.CostDerGD(GD_init,Cont)(GD_init)
-#Module.CostGradGD(GD_init,Cont)
-end = timeit.default_timer()
-print(end - start)
-
-
-#%%
-
-
-import timeit
-
-start = timeit.default_timer()
-#energyF=functionalF([GD_init,Cont_init])
-#vectField=ModuleF.ComputeField(GD_init,Cont)
-traj=functionalF.ComputetrajectoryGD([GD_init,Cont_init])
-#speed=ModuleF.ApplyVectorField(GD_init,vectField)
-#ModuleF.Cost(GD_init,Cont)
-
-#B=ModuleF.ComputeFieldDer(GD_init,Cont)(GD_init)
-#op=ModuleF.ApplyModule(ModuleF,GD_init,Cont)
-#B=op(GD_init)
-#ModuleF.CostDerGD(GD_init,Cont)(GD_init)
-#ModuleF.CostGradCont(GD_init,Cont)
-end = timeit.default_timer()
-print(end - start)
-
-
-
-
-#%%
-speed0=vectField[0].interpolation(np.array(GD_init).T)
-speed1=vectField[1].interpolation(np.array(GD_init).T)
-
-speed = Module.GDspace.element(np.array([speed0,speed1]).T)
-
-
-speed = Module.GDspace.element(np.array([vectField[i].interpolation(np.array(GD_init).T) for i in range(2)]).T)
-#%%
-
-grad=functional.gradient([GD_init,Cont_init])
-
-#%% Naive Gradient descent : gradient computed by finite differences
-# TRANSLATION
-#functional=functionalF
+#%% LDDMM  gradient descent
 niter=200
-eps = 0.1
-X=functional.domain.element([GD_init,Cont_init].copy())
-attachment_term=functional(X)
-energy=attachment_term
-print(" Initial , attachment term : {}".format(attachment_term))
-gradGD=functional.Module.GDspace.element()
-gradCont=odl.ProductSpace(functional.Module.Contspace,nb_time_point_int+1).element()
+eps=0.1
+vector_fields_list_init=energy_op_lddmm.domain.zero()
+vector_fields_list=vector_fields_list_init.copy()
+attachment_term=energy_op_lddmm(vector_fields_list)
+print(" Initial ,  attachment term : {}".format(attachment_term))
 
-d_GD=functional.Module.GDspace.zero()
-d_Cont=odl.ProductSpace(functional.Module.Contspace,nb_time_point_int+1).zero()
-
-delta=0.001
-#energy=functional(X)+1
-cont=1
 for k in range(niter):
-
-    if(cont==1):
-        #Computation of the gradient by finite differences
-        for t in range(nb_time_point_int+1):
-            for n in range(Ntrans):
-                for d in range(dim):
-                    X_temp=X.copy()
-                    X_temp[1][t][n][d]+=delta
-                    energy_der=functional(X_temp)
-                    #print('t={}  n={}  d={}  energy_der={}'.format(t,n,d,energy_der))
-                    gradCont[t][n][d]=(energy_der-energy)/delta
-
-        for n in range(Ntrans):
-            for d in range(dim):
-                X_temp=X.copy()
-                X_temp[0][n][d]+=delta
-                energy_der=functional(X_temp)
-                #print('n={}  d={}  energy_der={}'.format(n,d,energy_der))
-                gradGD[n][d]=(energy_der-energy)/delta
-        #print(gradGD)
-        grad=functional.domain.element([gradGD,gradCont])
-
-    X_temp= (X- eps *grad).copy()
-    #print(X[0])
-    energytemp=functional(X_temp)
-    if energytemp< energy:
-        X= X_temp.copy()
-        energy = energytemp
-        print(" iter : {}  ,  energy : {}".format(k,energy))
-        cont=1
-        eps = eps*1.2
-    else:
-        eps = eps/2
-        print(" iter : {}  ,  epsilon : {}".format(k,eps))
-        cont=0
+    grad=functional_lddmm.gradient(vector_fields_list)
+    vector_fields_list= (vector_fields_list- eps *grad).copy()
+    attachment_term=energy_op_lddmm(vector_fields_list)
+    print(" iter : {}  ,  attachment term : {}".format(k,attachment_term))
 #
 
+#%% see result LDDMM
+I_t=odl.deform.ShootTemplateFromVectorFields(vector_fields_list, template)
 
+grid_points=compute_grid_deformation_list(vector_fields_list, 1/nb_time_point_int, template.space.points().T)
 
-#%% Naive Gradient descent : gradient computed by finite differences
-#AFFINE
-#functional=functionalF
-niter=100
-eps = 0.001
-X=functional.domain.element([GD_init,Cont_init].copy())
-attachment_term=functional(X)
-energy=attachment_term
-print(" Initial , attachment term : {}".format(attachment_term))
-gradGD=functional.Module.GDspace.element()
-gradCont=odl.ProductSpace(functional.Module.Contspace,nb_time_point_int+1).element()
+for t in range(nb_time_point_int+1):
 
-d_GD=functional.Module.GDspace.zero()
-d_Cont=odl.ProductSpace(functional.Module.Contspace,nb_time_point_int+1).zero()
-
-delta=0.1
-#energy=functional(X)+1
-cont=1
-for k in range(niter):
-
-    if(cont==1):
-        #Computation of the gradient by finite differences
-        for t in range(nb_time_point_int+1):
-            for n in range(NAffine):
-                for d in range(dim+1):
-                    for u in range(dim):
-                        X_temp=X.copy()
-                        X_temp[1][t][n][d][u]+=delta
-                        energy_der=functional(X_temp)
-                    #print('t={}  n={}  d={}  energy_der={}'.format(t,n,d,energy_der))
-                        gradCont[t][n][d][u]=(energy_der-energy)/delta
-
-        for n in range(NAffine):
-            for d in range(dim):
-                X_temp=X.copy()
-                X_temp[0][n][d]+=delta
-                energy_der=functional(X_temp)
-                #print('n={}  d={}  energy_der={}'.format(n,d,energy_der))
-                gradGD[n][d]=(energy_der-energy)/delta
-        #print(gradGD)
-        grad=functional.domain.element([gradGD,gradCont])
-
-    X_temp= (X- eps *grad).copy()
-    print(X[0])
-    energytemp=functional(X_temp)
-    if energytemp< energy:
-        X= X_temp.copy()
-        energy = energytemp
-        print(" iter : {}  ,  energy : {}".format(k,energy))
-        cont=1
-        eps = eps*1.2
-    else:
-        eps = eps*0.8
-        print(" iter : {}  ,  epsilon : {}".format(k,eps))
-        cont=0
+    #t=nb_time_point_int
+    I_t[t].show('LDDMM time {}'.format(t+1))
+    grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
+    plot_grid(grid, 5)
 #
 
+#Saving results in files
+for t in range(nb_time_point_int+1):
+    np.savetxt('/home/bgris/odl/examples/Mixed_SL/LDDMM_Vector_Field_time_{}'.format(t),vector_fields_list[t])
+    np.savetxt('/home/bgris/odl/examples/Mixed_SL/LDDMM_Deformed_Grid_time_{}'.format(t),grid_points[t])
 
+
+# Load data
+vector_fields_list_load=energy_op_lddmm.domain.zero()
+grid_load=[]
+for t in range(nb_time_point_int+1):
+    vector_fields_list_load[t]=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/LDDMM_Vector_Field_time_{}'.format(t))).copy()
+    grid_t=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/LDDMM_Deformed_Grid_time_{}'.format(t))).copy()
+    grid_load.append(np.array(grid_t).copy())
+
+
+#%%  see result Mixed strategy
+I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
+
+vector_fields_list_tot=Mix_vect_field(vector_fields_list,X[0],X[1])
+grid_points=compute_grid_deformation_list_bis(vector_fields_list_tot, 1/nb_time_point_int, template.space.points().T)
+
+for t in range(nb_time_point_int+1):
+    #t=nb_time_point_int
+    I_t[t].show('Modular time {}'.format(t+1))
+    grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
+    plot_grid(grid, 5)
+#
+
+#Saving results in files
+for i in range(NbMod):
+    np.savetxt('/home/bgris/odl/examples/Mixed_SL/Mixed_GD_time_0_Mod_{}'.format(i),np.asarray(X[0][0]))
+for t in range(nb_time_point_int+1):
+    for i in range(NbMod):
+        np.savetxt('/home/bgris/odl/examples/Mixed_SL/Mixed_Cont_time_{}_Mod_{}'.format(t,i),X[1][t][i])
+    np.savetxt('/home/bgris/odl/examples/Mixed_SL/Mixed_Vector_Field_time_{}'.format(t),vector_fields_list[t])
+    np.savetxt('/home/bgris/odl/examples/Mixed_SL/Mixed_Deformed_Grid_time_{}'.format(t),grid_points[t])
+
+
+# Load data
+vector_fields_list_load=energy_op_lddmm.domain.zero()
+grid_load=[]
+for t in range(nb_time_point_int+1):
+    vector_fields_list_load[t]=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/Mixed_Vector_Field_time_{}'.format(t))).copy()
+    grid_t=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/MixedDeformed_Grid_time_{}'.format(t))).copy()
+    grid_load.append(np.array(grid_t).copy())
+
+#%%
+GD_init=Module.GDspace.element([[[0,-10]]])
+Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
 
 #%% Naive Gradient descent : gradient computed by finite differences
+# Descent of vect field too
 # Descent for all times simultaneously
 #Combination of modules
 #functional=functionalF
-niter=10
+niter=100
 eps = 0.01
-#GD_init=Module.GDspace.element([GD_init_trans])
-#Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
 
-X=functional.domain.element([GD_init,Cont_init].copy())
-attachment_term=functional(X)
+X=functional_mod.domain.element([GD_init,Cont_init].copy())
+
+vector_fields_list_init=energy_op_lddmm.domain.zero()
+vector_fields_list=vector_fields_list_init.copy()
+#%%
+attachment_term=attach_tot(vector_fields_list,X[0],X[1])
 energy=attachment_term
-print(" Initial , attachment term : {}".format(attachment_term))
-gradGD=functional.Module.GDspace.element()
-gradCont=odl.ProductSpace(functional.Module.Contspace,nb_time_point_int+1).element()
+Reg_mod=functional_mod.ComputeReg(X)
+print(" Initial , attachment term : {}, reg_mod = {}".format(attachment_term,Reg_mod))
+gradGD=functional_mod.Module.GDspace.element()
+gradCont=odl.ProductSpace(functional_mod.Module.Contspace,nb_time_point_int+1).element()
 
-d_GD=functional.Module.GDspace.zero()
-d_Cont=odl.ProductSpace(functional.Module.Contspace,nb_time_point_int+1).zero()
+d_GD=functional_mod.Module.GDspace.zero()
+d_Cont=odl.ProductSpace(functional_mod.Module.Contspace,nb_time_point_int+1).zero()
 ModulesList=Module.ModulesList
 NbMod=len(ModulesList)
 delta=0.1
-epsmax=10
+epsmax=1
+deltamin=0.1
 # 0=SumTranslations, 1=affine, 2=scaling, 3=rotation
-Types=[0]
-#energy=functional(X)+1
-eps0Cont=[1,1]
-eps0GD=[1,1]
+Types=[3]
+energy=functional(X)+1
+eps0Cont=[0.01,1]
+eps0GD=[0.1,1]
+eps_vect_field=0.01
 cont=1
 for k in range(niter):
 
+    ## gradient with respect to vector field
+    #grad_vect_field=grad_attach_vector_field(vector_fields_list,X[0],X[1])
+    ## (1-lamb1) because of the gradient of the regularity term
+    #vector_fields_list=((1-eps_vect_field*lamb1)*vector_fields_list-eps_vect_field*grad_vect_field ).copy()
+
+    energy=attach_tot(vector_fields_list,X[0],X[1])
+    Reg_mod=functional_mod.ComputeReg(X)
+    energy_mod=Reg_mod+energy
+    print('k={}  attachment term = {}, reg_mod={}'.format(k,energy,Reg_mod))
     #Computation of the gradient by finite differences
 
     for i in range(NbMod):
@@ -460,25 +600,26 @@ for k in range(niter):
                         eps=eps0Cont[i]
                         ismax=0
                         der=np.empty(nb_time_point_int)
-                        print('k={} i={}  n={}  d={}  u={} eps={}  energy= {}'.format(k,i,n,d,u,eps,energy))
+                        print('k={} i={}  n={}  d={}  u={} eps={} attachment term = {}'.format(k,i,n,d,u,eps,energy))
                         for t in range(nb_time_point_int):
                             X_temp_diff=X.copy()
                             delta=0.1*np.abs(X_temp_diff[1][t][i][n][d][u])
                             if (delta==0):
                                 delta=0.1
                             X_temp_diff[1][t][i][n][d][u]+=delta
-                            energy_diff=functional(X_temp_diff)
-                            der[t]=(energy_diff-energy)/delta
+                            energy_diff=attach_tot(vector_fields_list,X_temp_diff[0],X_temp_diff[1])
+                            Reg_mod_diff=functional_mod.ComputeReg(X_temp_diff)
+                            der[t]=(energy_diff+Reg_mod_diff-energy-Reg_mod)/delta
                             X_temp[1][t][i][n][d][u]-=eps*der[t]
-                        energy_temp=functional(X_temp)
-                        if(energy_temp>energy):
+                        energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                        if(energy_temp>energy_mod):
                             for ite in range(10):
                                 eps*=0.8
                                 X_temp=X.copy()
                                 for t in range(nb_time_point_int):
                                     X_temp[1][t][i][n][d][u]-=eps*der[t]
-                                energy_temp=functional(X_temp)
-                                if (energy_temp<energy):
+                                energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                                if (energy_mod<energy):
                                     ismax=1
                                     eps0Cont[i]=eps
                                     break
@@ -488,8 +629,8 @@ for k in range(niter):
                                 X_temp=X.copy()
                                 for t in range(nb_time_point_int):
                                     X_temp[1][t][i][n][d][u]-=eps*der[t]
-                                energy_temp=functional(X_temp)
-                                if (energy_temp>=energy):
+                                energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                                if (energy_temp>=energy_mod):
                                     eps/=1.2
                                     break
                             eps0Cont[i]=eps
@@ -500,7 +641,9 @@ for k in range(niter):
                         if (ismax==1):
                             for t in range(nb_time_point_int):
                                 X[1][t][i][n][d][u]-=eps*der[t]
-                            energy=functional(X)
+                            energy=attach_tot(vector_fields_list,X[0],X[1])
+                            energy_mod=functional_mod.ComputeReg(X)+attach_tot(vector_fields_list,X[0],X[1])
+                            Reg_mod=functional_mod.ComputeReg(X)
 
         elif (Types[i]==0):
                 Ntrans=ModulesList[i].Ntrans
@@ -509,28 +652,29 @@ for k in range(niter):
                         if eps0Cont[i]>epsmax:
                             eps0Cont[i]=epsmax
                         eps=eps0Cont[i]
-                        print('k={} i={}  n={}  d={} eps={}  energy= {}'.format(k,i,n,d,eps,energy))
+                        print('k={} i={}  n={}  d={} eps={}  attachment term = {}'.format(k,i,n,d,eps,energy))
                         X_temp=X.copy()
                         ismax=0
                         der=np.empty(nb_time_point_int)
                         for t in range(nb_time_point_int):
                             X_temp_diff=X.copy()
-                            delta=np.abs(X_temp_diff[1][t][i][n][d])
-                            if (delta==0):
-                                delta=0.1
+                            delta=0.1*np.abs(X_temp_diff[1][t][i][n][d])
+                            if (delta<1e-3):
+                                delta=deltamin
                             X_temp_diff[1][t][i][n][d]+=delta
-                            energy_diff=functional(X_temp_diff)
-                            der[t]=(energy_diff-energy)/delta
+                            energy_diff=attach_tot(vector_fields_list,X_temp_diff[0],X_temp_diff[1])
+                            Reg_mod_diff=functional_mod.ComputeReg(X_temp_diff)
+                            der[t]=(energy_diff+Reg_mod_diff-energy-Reg_mod)/delta
                             X_temp[1][t][i][n][d]-=eps*der[t]
-                        energy_temp=functional(X_temp)
-                        if(energy_temp>energy):
+                        energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                        if(energy_temp>energy_mod):
                             for ite in range(10):
                                 eps*=0.8
                                 X_temp=X.copy()
                                 for t in range(nb_time_point_int):
                                     X_temp[1][t][i][n][d]-=eps*der[t]
-                                energy_temp=functional(X_temp)
-                                if (energy_temp<energy):
+                                energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                                if (energy_temp<energy_mod):
                                     ismax=1
                                     eps0Cont[i]=eps
                                     break
@@ -540,8 +684,8 @@ for k in range(niter):
                                 X_temp=X.copy()
                                 for t in range(nb_time_point_int):
                                     X_temp[1][t][i][n][d]-=eps*der[t]
-                                energy_temp=functional(X_temp)
-                                if (energy_temp>=energy):
+                                energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                                if (energy_temp>=energy_mod):
                                     eps/=1.2
                                     break
                             eps0Cont[i]=eps
@@ -552,9 +696,9 @@ for k in range(niter):
                         if (ismax==1):
                             for t in range(nb_time_point_int):
                                 X[1][t][i][n][d]-=eps*der[t]
-                            energy=functional(X)
-
-
+                            energy=attach_tot(vector_fields_list,X[0],X[1])
+                            energy_mod=functional_mod.ComputeReg(X)+attach_tot(vector_fields_list,X[0],X[1])
+                            Reg_mod=functional_mod.ComputeReg(X)
 
         elif (Types[i]==3 or Types[i]==2):
                 if (Types[i]==3):
@@ -562,31 +706,32 @@ for k in range(niter):
                 else:
                       Nrot=ModulesList[i].NScaling
                 for n in range(Nrot):
-                        print('k={}  i={}  n={}   energy= {}'.format(k,i,n,energy))
                         X_temp=X.copy()
                         if (eps0Cont[i]>epsmax):
                             eps0Cont[i]=epsmax
                         eps=eps0Cont[i]
+                        print('k={}  i={}  n={}   energy= {}'.format(k,i,n,energy))
                         ismax=0
                         der=np.empty(nb_time_point_int)
                         for t in range(nb_time_point_int):
                             X_temp_diff=X.copy()
-                            delta=np.abs(X_temp_diff[1][t][i][n])
-                            if (delta==0):
-                                delta=0.1
+                            delta=0.1*np.abs(X_temp_diff[1][t][i][n])
+                            if (delta<1e-3):
+                                delta=deltamin
                             X_temp_diff[1][t][i][n]+=delta
-                            energy_diff=functional(X_temp_diff)
-                            der[t]=(energy_diff-energy)/delta
+                            energy_diff=attach_tot(vector_fields_list,X_temp_diff[0],X_temp_diff[1])
+                            Reg_mod_diff=functional_mod.ComputeReg(X_temp_diff)
+                            der[t]=(energy_diff+Reg_mod_diff-energy-Reg_mod)/delta
                             X_temp[1][t][i][n]-=eps*der[t]
-                        energy_temp=functional(X_temp)
-                        if(energy_temp>energy):
+                        energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                        if(energy_temp>energy_mod):
                             for ite in range(10):
                                 eps*=0.8
                                 X_temp=X.copy()
                                 for t in range(nb_time_point_int):
                                     X_temp[1][t][i][n]-=eps*der[t]
-                                energy_temp=functional(X_temp)
-                                if (energy_temp<energy):
+                                energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                                if (energy_temp<energy_mod):
                                     ismax=1
                                     eps0Cont[i]=eps
                                     break
@@ -596,7 +741,7 @@ for k in range(niter):
                                 X_temp=X.copy()
                                 for t in range(nb_time_point_int):
                                     X_temp[1][t][i][n]-=eps*der[t]
-                                energy_temp=functional(X_temp)
+                                energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
                                 if (energy_temp>=energy):
                                     eps/=1.2
                                     break
@@ -608,38 +753,50 @@ for k in range(niter):
                         if(ismax==1):
                             for t in range(nb_time_point_int):
                                 X[1][t][i][n]-=eps*der[t]
-                            energy=functional(X)
+                            energy=attach_tot(vector_fields_list,X[0],X[1])
+                            energy_mod=functional_mod.ComputeReg(X)+attach_tot(vector_fields_list,X[0],X[1])
+                            Reg_mod=functional_mod.ComputeReg(X)
 
 
 
     for i in range(NbMod):
-        if (Types[i]==0):
-
-            Ntrans=ModulesList[i].Ntrans
+            #if (Types[i]==0):
+            if (Types[i]==3):
+                Ntrans=ModulesList[i].NRotation
+            elif (Types[i]==3):
+                Ntrans=ModulesList[i].NScaling
+            elif (Types[i]==1):
+                Ntrans=ModulesList[i].NAffine
+            elif (Types[i]==0):
+                Ntrans=ModulesList[i].Ntrans
             for n in range(Ntrans):
                 for d in range(dim):
                     if eps0GD[i]>epsmax:
                         eps0GD[i]=epsmax
                     eps=eps0GD[i]
                     print('k={} i={}  n={}  d={} eps={} energy= {}'.format(k,i,n,d,eps,energy))
-
+                    print(X[0])
                     eps1=eps
                     ismax=0
                     X_temp=X.copy()
-                    delta=0.1*functional.Module.ModulesList[i].KernelClass.scale
+                    delta=0.1*functional_mod.Module.ModulesList[i].KernelClass.scale
                     X_temp[0][i][n][d]+=delta
-                    energy_diff=functional(X_temp)
-                    der=(energy_diff-energy)/delta
+                    energy_diff=attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                    print('energy_diff = {}'.format(energy_diff))
+                    Reg_mod_diff=functional_mod.ComputeReg(X_temp)
+                    der=(energy_diff+Reg_mod_diff-energy-Reg_mod)/delta
+                    print('der={}'.format(der))
                     X_temp=X.copy()
                     X_temp[0][i][n][d]-=eps*der
-                    energy_temp=functional(X_temp)
+                    energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                    print('energy-temp = {}'.format(energy_temp))
                     if(energy_temp>energy):
                         for ite in range(10):
                             eps*=0.8
                             X_temp=X.copy()
                             X_temp[0][i][n][d]-=eps*der
-                            energy_temp=functional(X_temp)
-                            if (energy_temp<energy):
+                            energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                            if (energy_temp<energy_mod):
                                 ismax=1
                                 eps0GD[i]=eps
                                 break
@@ -648,8 +805,8 @@ for k in range(niter):
                             eps*=1.2
                             X_temp=X.copy()
                             X_temp[0][i][n][d]-=eps*der
-                            energy_temp=functional(X_temp)
-                            if (energy_temp>energy):
+                            energy_temp=functional_mod.ComputeReg(X_temp)+attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+                            if (energy_temp>energy_mod):
                                 eps/=1.2
                                 break
                         eps0GD[i]=eps
@@ -658,9 +815,12 @@ for k in range(niter):
                     # Now we have 'the best' eps
                     if (ismax==1):
                         X[0][i][n][d]-=eps*der
-                        energy=functional(X)
-
-        elif (Types[i]==3 or Types[i]==2 or Types[i]==1):
+                        energy=attach_tot(vector_fields_list,X[0],X[1])
+                        energy_mod=functional_mod.ComputeReg(X)+attach_tot(vector_fields_list,X[0],X[1])
+                        Reg_mod=functional_mod.ComputeReg(X)
+#
+#%%
+        """elif (Types[i]==3 or Types[i]==2 or Types[i]==1):
             if (Types[i]==3):
                 Nrot=ModulesList[i].NRotation
             elif (Types[i]==3):
@@ -708,7 +868,7 @@ for k in range(niter):
                     if (ismax==1):
                         X[0][i][n][d]-=eps*der
                         energy=functional(X)
-
+#           """
 
 
 
@@ -990,65 +1150,33 @@ for k in range(niter):
 
 
 
-
-#%%
-
-def kernelFun(x):
-    sigma = 2.0
-    scaled = [xi ** 2 / (2 * sigma ** 2) for xi in x]
-    return np.exp(-sum(scaled))
-
-def kernelOpFun(x):
-    return kernel.Eval(x)
-#%% Gradient descent
-functional=functionalF
-niter=100
-eps = 0.001
-X=functional.domain.element([GD_init,Cont_init].copy())
-attachment_term=functional(X)
-print(" Initial , attachment term : {}".format(attachment_term))
-
-energy=functional(X)+1
-for k in range(niter):
-    grad=functional.gradient(X)
-    X= (X- eps *grad).copy()
-    energytemp=functional(X)
-    if energytemp< energy:
-        X= (X- eps *grad).copy()
-        energy = energytemp
-        print(" iter : {}  ,  energy : {}".format(k,energy))
-    else:
-        eps = eps/2
-        print(" iter : {}  ,  epsilon : {}".format(k,eps))
-#
 #%%  see result
-I_t=template
-GD_t=functional.ComputetrajectoryGD(X)
-I_t.show('time {}'.format(0))
+I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
+
+vector_fields_list_tot=Mix_vect_field(vector_fields_list,X[0],X[1])
+grid_points=compute_grid_deformation_list(vector_fields_list_tot, 1/nb_time_point_int, template.space.points().T)
+
 for t in range(nb_time_point_int+1):
-    vect_field=-Module.ComputeField(GD_t[t],X[1][t]).copy()
-    deform_op = odl.deform.LinDeformFixedTempl(I_t)
-    I_t = deform_op(vect_field)
-    I_t.show('time {}'.format(t+1))
+    I_t[t].show('time {}'.format(t+1))
+    #grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
+    #plot_grid(grid, 2)
 #
 
-#%%
+#%% See the non modular part
 
-I_t = functional.Shoot(X)
-I_t[5].show()
+I_t=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vector_fields_list, template)
 
-data.show()
-((data[0]-I_t[0])**2).show('Initial difference')
-((data[0]-I_t[5])**2).show('Final difference')
-#%%
-data_image[0].show()
+for t in range(nb_time_point_int+1):
+    I_t[t].show('time {}'.format(t+1))
+#
+#%% See modular part
+vect_field_mod_list=ComputeModularVectorFields(vector_fields_list,X[0],X[1])
+vect_field_mod_inter=odl.ProductSpace(template.space.tangent_bundle,nb_time_point_int +1).element([ [vect_field_mod_list[i][u].interpolation(template.space.points().T) for u in range(dim)] for i in range(nb_time_point_int+1)])
+I_t=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_mod_inter, template)
 
-((template-data_image[0])**2).show('Initial difference')
-((I_t-data_image[0])**2).show('Final difference')
-
-
-((forward_op(template-data_image[0]))**2).show('Initial difference')
-((forward_op(I_t-data_image[0]))**2).show('Final difference')
+for t in range(nb_time_point_int+1):
+    I_t[t].show('time {}'.format(t+1))
+#
 
 #%% See deformation
 

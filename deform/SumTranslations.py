@@ -28,7 +28,7 @@ from odl.set import LinearSpace, LinearSpaceElement, Set, Field
 from odl.deform import TemporalAttachmentLDDMMGeom
 from odl.deform import ShootTemplateFromVectorFields
 from odl.solvers.functional.functional import Functional
-from deform.DeformationModuleAbstract import DeformationModule
+from DeformationModulesODL.deform.DeformationModuleAbstract import DeformationModule
 __all__ = ('SumTranslations', 'SumTranslationsFourier')
 
 
@@ -70,7 +70,10 @@ class SumTranslations(DeformationModule):
 
         self.Ntrans=Ntrans
         self.KernelClass=Kernel
-        self.Kernel=Kernel.Eval
+        #self.Kernel=Kernel.Eval
+        def kernelOpFun(x):
+            return Kernel.Eval(x)
+        self.Kernel=kernelOpFun
         self.dim=DomainField.ndim
 
         GDspace=odl.ProductSpace(odl.space.rn(self.dim),self.Ntrans)
@@ -188,10 +191,11 @@ class SumTranslations(DeformationModule):
     def ApplyVectorField(self,GD,vect_field):
             #GD=self.GDspace.element(X[0])
             #vect_field=self.DomainField.tangent_bundle.element(X[1])
-            speed=self.GDspace.element()
-            for u in range(self.dim):
-                for i in range(len(GD)):
-                    speed[i][u]=vect_field[u].interpolation(GD[i])
+            #speed=self.GDspace.element()
+            #for u in range(self.dim):
+            #   for i in range(len(GD)):
+            #       speed[i][u]=vect_field[u].interpolation(GD[i])
+            speed=self.GDspace.element(np.array([vect_field[i].interpolation(np.array(GD).T) for i in range(self.dim)]).T)
 
             return speed
 
@@ -273,7 +277,7 @@ class SumTranslations(DeformationModule):
             for j in range(self.Ntrans):
                 prod=[hi*hj for hi, hj in zip(Cont[i],Cont[j])]
                 kern = self.KernelClass.gradient(odl.space.rn(self.dim).element([xd - ou for xd, ou in zip(GD[j], GD[i])]))
-                grad[j]+=sum(prod)*kern.copy()
+                grad[j]+=sum(prod)*odl.space.rn(self.dim).element(kern.copy())
 
         return grad
 
@@ -300,7 +304,9 @@ class SumTranslationsFourier(DeformationModule):
 
         self.Ntrans=Ntrans
         self.KernelClass=Kernel
-        self.Kernel=Kernel.Eval
+        def kernelOpFun(x):
+            return Kernel.Eval(x)
+        self.Kernel=kernelOpFun
         self.dim=DomainField.ndim
 
         GDspace=odl.ProductSpace(odl.space.rn(self.dim),self.Ntrans)
@@ -315,12 +321,36 @@ class SumTranslationsFourier(DeformationModule):
 
         basisGD=basis.copy()
         basisCont=basis.copy()
+
+        # FFT setting for data matching term, 1 means 100% padding
+        padded_size = 8 * DomainField.shape[0]
+        padded_ft_fit_op = padded_ft_op(DomainField, padded_size)
+        vectorial_ft_fit_op = DiagonalOperator(*([padded_ft_fit_op] * self.dim))
+        self.vectorial_ft_fit_op=vectorial_ft_fit_op
+
+        # Compute the FT of kernel in fitting term
+        discretized_kernel = fitting_kernel(DomainField, self.Kernel)
+        ft_kernel_fitting = vectorial_ft_fit_op(discretized_kernel)
+        self.ft_kernel_fitting =ft_kernel_fitting.copy()
+
+        # Compute the FT of the derivatives of the kernel in fitting term
+        ft_kernel_fitting_der=[]
+        for i in range(self.dim):
+            def kernel_der(x):
+                return Kernel.gradient(x)[i]
+            discretized_kernel_der = fitting_kernel(DomainField, kernel_der)
+            ft_kernel_fitting_der.append(vectorial_ft_fit_op(discretized_kernel_der).copy())
+        self.ft_kernel_fitting_der =ft_kernel_fitting_der.copy()
+
+
+
         super().__init__(GDspace,Contspace,basisGD,basisCont,DomainField)
 
     def ProjectGD(self,o,h):
         """Return a vector field equal to
         zero except on points of the grid the closest to GDs
-        where it is equal to the sum of the corresponding controls
+        where it is equal to the sum of the corresponding controls (multiplied
+        by the cell volume in order to have a discretized dirac)
         """
 
         vect_field=[]
@@ -335,6 +365,29 @@ class SumTranslationsFourier(DeformationModule):
 
         return self.DomainField.tangent_bundle.element(vect_field)
 
+
+    def ProjectGDMultiplier(self,o,h,mult):
+        """Return a list of vector fields with the same size as mult[0] (= dim)
+        equal to zero except on points of the grid the closest to GDs
+        where it is equal to the sum of the corresponding i-th controls multiplied
+        by mult[i][k] for the k-th grid (multiplied
+        by the cell volume in order to have a discretized dirac)
+        """
+        vect_field=[]
+        for u in range(self.dim):
+            vect_field_temp=[]
+            for v in range(self.dim):
+                vect_field_temp.append(np.zeros(self.DomainField.shape))
+            vect_field.append(vect_field_temp.copy())
+
+        for i in range(self.Ntrans):
+            indi = self.DomainField.partition.index(o[i])
+
+            for u in range(self.dim):
+                for v in range(self.dim):
+                    vect_field[v][u][indi]+= mult[i][v]* h[i][u]/self.DomainField.cell_volume
+
+        return [self.DomainField.tangent_bundle.element(vect_field[i].copy()) for i in range(self.dim)]
 
 
     def ComputeField(self, o,h):
@@ -356,23 +409,8 @@ class SumTranslationsFourier(DeformationModule):
 
         #vector_field=self.DomainField.tangent_bundle.zero()
         vect_fieldGDCont=self.ProjectGD(o,h)
-
-
-        # FFT setting for data matching term, 1 means 100% padding
-        padded_size = 2 * self.DomainField.shape[0]
-        padded_ft_fit_op = padded_ft_op(self.DomainField, padded_size)
-        vectorial_ft_fit_op = DiagonalOperator(*([padded_ft_fit_op] * self.dim))
-
-
-        # Compute the FT of kernel in fitting term
-        discretized_kernel = fitting_kernel(self.DomainField, self.Kernel)
-        ft_kernel_fitting = vectorial_ft_fit_op(discretized_kernel)
-
-
-
-
-        vector_field= (2 * np.pi) ** (self.dim / 2.0) * vectorial_ft_fit_op.inverse(
-        vectorial_ft_fit_op(vect_fieldGDCont) *ft_kernel_fitting)
+        vector_field= (2 * np.pi) ** (self.dim / 2.0) * self.vectorial_ft_fit_op.inverse(
+        self.vectorial_ft_fit_op(vect_fieldGDCont) *self.ft_kernel_fitting)
 
         return vector_field
 
@@ -385,14 +423,11 @@ class SumTranslationsFourier(DeformationModule):
                 self.Cont=ope.Contspace.element(Cont).copy()
                 super().__init__(odl.space.rn(ope.dim), odl.space.rn(ope.dim),
                                  linear=False)
-
-
             def _call(self,x):
                 speed=odl.space.rn(ope.dim).zero()
                 for i in range(ope.Ntrans):
                     a=ope.Kernel(self.GD[i]-x)
                     speed+=a*self.Cont[i]
-
                 return speed
 
         return Eval
@@ -411,11 +446,11 @@ class SumTranslationsFourier(DeformationModule):
             def _call(self,dGD):
                 dGD=ope.GDspace.element(dGD).copy()
                 vector_field=ope.DomainField.tangent_bundle.zero()
-
-                mg = ope.DomainField.meshgrid
-                for i in range(ope.Ntrans):
-                    kern = ope.KernelClass.derivative([mgu - ou for mgu, ou in zip(mg, self.GD[i])])
-                    vector_field += ope.DomainField.tangent_bundle.element([kern.Eval(dGD[i]) * hu for hu in self.Cont[i]])
+                vect_fieldGDCont_list=ope.ProjectGDMultiplier(self.GD,self.Cont,dGD)
+                vector_field=ope.DomainField.tangent_bundle.zero()
+                for i in range(len(vect_fieldGDCont_list)):
+                    vector_field+=(2 * np.pi) ** (ope.dim / 2.0) * ope.vectorial_ft_fit_op.inverse(
+                                      ope.vectorial_ft_fit_op(vect_fieldGDCont_list[i]) *ope.ft_kernel_fitting_der[i]).copy()
 
                 return vector_field
 
@@ -448,11 +483,11 @@ class SumTranslationsFourier(DeformationModule):
     def ApplyVectorField(self,GD,vect_field):
             #GD=self.GDspace.element(X[0])
             #vect_field=self.DomainField.tangent_bundle.element(X[1])
-            speed=self.GDspace.element()
-            for u in range(self.dim):
-                for i in range(len(GD)):
-                    speed[i][u]=vect_field[u].interpolation(GD[i])
-
+            #speed=self.GDspace.element()
+            #for u in range(self.dim):
+            #    for i in range(len(GD)):
+            #        speed[i][u]=vect_field[u].interpolation(GD[i])
+            speed=self.GDspace.element(np.array([vect_field[i].interpolation(np.array(GD).T) for i in range(self.dim)]).T)
             return speed
 
     @property
@@ -460,23 +495,33 @@ class SumTranslationsFourier(DeformationModule):
         ope = self
         class apply(Operator):
             def __init__(self,Module,GDmod,Contmod):
-                self.apply_op=Module.ComputeFieldEvaluate(GDmod,Contmod)
+                self.vectfield=Module.ComputeField(GDmod,Contmod)
                 super().__init__(ope.GDspace, ope.GDspace,
                                  linear=False)
 
             def _call(self,GD):
-                speed=ope.GDspace.element()
-                for i in range(len(GD)):
-                    speed[i]=self.apply_op(GD[i])
+                speed=ope.GDspace.element(np.array([self.vectfield[i].interpolation(np.array(GD).T) for i in range(ope.dim)]).T)
+
                 return speed
         return apply
 
     def Cost(self,GD,Cont):
-        energy=0
-        for i in range(self.Ntrans):
-            for j in range(self.Ntrans):
-                prod=[hi*hj for hi, hj in zip(Cont[i],Cont[j])]
-                energy+=self.Kernel(GD[i]-GD[j])*sum(prod)
+        #energy=0
+        #for i in range(self.Ntrans):
+         #   for j in range(self.Ntrans):
+        #        prod=[hi*hj for hi, hj in zip(Cont[i],Cont[j])]
+         #       energy+=self.Kernel(GD[i]-GD[j])*sum(prod)
+
+        vect_fieldGDCont=self.ProjectGD(GD,Cont)
+
+        vect_field= (2 * np.pi) ** (self.dim / 2.0) * self.vectorial_ft_fit_op.inverse(
+        self.vectorial_ft_fit_op(vect_fieldGDCont) *self.ft_kernel_fitting)
+
+        speed=self.GDspace.element(np.array([vect_field[i].interpolation(np.array(GD).T) for i in range(self.dim)]).T)
+
+        energy=speed.inner(Cont)
+
+
         return energy
 
 
@@ -489,14 +534,18 @@ class SumTranslationsFourier(DeformationModule):
                 self.Cont=ope.Contspace.element(Cont).copy()
                 super().__init__(ope.GDspace,
                                  linear=True)
-           def _call(self,dDG):
-                dGD=ope.GDspace.element(dDG).copy()
-                energy=0
-                for i in range(ope.Ntrans):
-                    for j in range(ope.Ntrans):
-                        prod=[hi*hj for hi, hj in zip(self.Cont[i],self.Cont[j])]
-                        kern = ope.KernelClass.derivative([xd - ou for xd, ou in zip(self.GD[j], self.GD[i])])
-                        energy+=kern.Eval(dGD[j]-dGD[i])*sum(prod)
+           def _call(self,dGD):
+                dGD=ope.GDspace.element(dGD).copy()
+                vector_field=ope.DomainField.tangent_bundle.zero()
+                vect_fieldGDCont_list=ope.ProjectGDMultiplier(self.GD,self.Cont,dGD)
+                vector_field=ope.DomainField.tangent_bundle.zero()
+                for i in range(len(vect_fieldGDCont_list)):
+                    vector_field+=(2 * np.pi) ** (ope.dim / 2.0) * ope.vectorial_ft_fit_op.inverse(
+                                      ope.vectorial_ft_fit_op(vect_fieldGDCont_list[i]) *ope.ft_kernel_fitting_der[i]).copy()
+
+                speed=ope.GDspace.element(np.array([vector_field[i].interpolation(np.array(self.GD).T) for i in range(ope.dim)]).T)
+
+                energy=2*speed.inner(self.Cont) # there is a factor 2 because in the convolution we in fact compute only half of the terms
 
                 return energy
         return compute
@@ -513,6 +562,7 @@ class SumTranslationsFourier(DeformationModule):
                 super().__init__(ope.Contspace,
                                  linear=True)
            def _call(self,dCont):
+                print('CostDerCont de SumtranslationsFourier TODO')
                 dCont=ope.Contspace.element(dCont).copy()
                 energy=0
                 for i in range(ope.Ntrans):
@@ -528,23 +578,27 @@ class SumTranslationsFourier(DeformationModule):
 
     def CostGradGD(self,GD,Cont):
         grad=self.GDspace.zero()
-
-        for i in range(self.Ntrans):
+        vect_fieldGDCont=self.ProjectGD(GD,Cont)
+        vect_field_list=[(2 * np.pi) ** (self.dim / 2.0) * self.vectorial_ft_fit_op.inverse(
+                                      self.vectorial_ft_fit_op(vect_fieldGDCont) *self.ft_kernel_fitting_der[i]).copy() for i in range(self.dim)]
+        for i in range(self.dim):
+            speed=self.GDspace.element(np.array([vect_field_list[i][u].interpolation(np.array(GD).T) for u in range(self.dim)]).T)
+            #speed= self.GDspace.element(speed.copy())
+            speed*=Cont.copy()
             for j in range(self.Ntrans):
-                prod=[hi*hj for hi, hj in zip(Cont[i],Cont[j])]
-                kern = self.KernelClass.gradient(odl.space.rn(self.dim).element([xd - ou for xd, ou in zip(GD[j], GD[i])]))
-                grad[j]+=sum(prod)*kern.copy()
+                grad[j][i]= sum(speed[j])
 
         return grad
 
 
 
     def CostGradCont(self,GD,Cont):
-        grad=self.Contspace.zero()
 
-        for i in range(self.Ntrans):
-            for j in range(self.Ntrans):
-                grad[j]+=self.Kernel(odl.space.rn(self.dim).element(GD[i]-GD[j]))*2*Cont[i].copy()
+        vect_fieldGDCont=self.ProjectGD(GD,Cont)
+        vector_field= (2 * np.pi) ** (self.dim / 2.0) * self.vectorial_ft_fit_op.inverse(
+                    self.vectorial_ft_fit_op(vect_fieldGDCont) *self.ft_kernel_fitting)
+
+        grad = 2*self.GDspace.element(np.array([vector_field[u].interpolation(np.array(GD).T) for u in range(self.dim)]).T)
 
         return grad
 

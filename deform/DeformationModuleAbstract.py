@@ -379,6 +379,38 @@ class Compound(DeformationModule):
 
 
 
+    def ApplyVectorField(self,GD,vect_field):
+            #GD=self.GDspace.element(X[0])
+            #vect_field=self.DomainField.tangent_bundle.element(X[1])
+            speed=self.GDspace.element()
+            for i in range(self.Nmod):
+                speed[i]=self.ModulesList[i].ApplyVectorField(GD[i],vect_field)
+
+            return speed
+
+
+
+
+    """def ApplyModule(self,GD,Module):
+        ope = self
+        class apply(Operator):
+            def __init__(self,Module,GDmod,Contmod):
+                super().__init__(ope.GDspace, ope.GDspace,
+                                 linear=False)
+
+            def _call(self,GD):
+                speed=ope.GDspace.element()
+                for i in range(self.Nmod):
+                    speed[i]=self.ModulesList[i].(GD[i])
+                    self.apply_op(GD[i])
+
+                for i in range(len(GD)):
+                    speed[i]=self.apply_op(GD[i])
+                return speed
+        return apply
+        """
+
+
     def Cost(self,GD,Cont):
         energy=0
         for i in range(self.Nmod):

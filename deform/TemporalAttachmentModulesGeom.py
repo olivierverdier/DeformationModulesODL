@@ -6,7 +6,6 @@ Created on Fri Apr  7 10:20:53 2017
 @author: bgris
 """
 
-
 """Operators and functions for 4D image registration via LDDMM."""
 
 # Imports for common Python 2/3 codebase
@@ -116,6 +115,7 @@ class FunctionalModulesGeom(Functional):
         self.Module=Module
         self.nb_data=self.data_time_points.size
         self.image_domain=forward_operators[0].domain
+        self.module_domain=self.Module.DomainField
         # Give the number of time intervals
         self.N = nb_time_point_int
 
@@ -130,7 +130,7 @@ class FunctionalModulesGeom(Functional):
 
 
         # sorted list of all the times
-        self.alltimes=np.arange(self.nb_data + self.N +1)
+        self.alltimes=np.empty(self.nb_data + self.N +1)
         # list with 0 if time of integration and 1 if data time point
         self.naturetime=np.arange(self.nb_data + self.N +1)
         j0=0
@@ -181,7 +181,7 @@ class FunctionalModulesGeom(Functional):
 
         reg=0
         attachment=0
-        contk=1
+        contk=0
         contj=0
 
         I_t=self.template.copy()
@@ -189,13 +189,18 @@ class FunctionalModulesGeom(Functional):
         # cost at time t=0
         reg+= self.Module.Cost(GD,Cont_t)
 
-        for i in range(1,self.nb_data + self.N +1):
-
-            if self.naturetime[i]==0:
+        for i in range(1,self.nb_data + self.N+1):
+            # iteration i starts with value at time self.alltimes[i-1]
+            # and ends with value at time self.alltimes[i]
+            if self.naturetime[i-1]==0:
                 Cont_t=Cont[contk].copy()
             else:
-                delta0=(self.data_time_points[contj] -((self.k_j_list[contj])/self.N))
-                Cont_t=((1-delta0)*Cont[self.k_j_list[contj]] + delta0*Cont[self.k_j_list[contj]]).copy()
+                if(self.k_j_list[contj]==self.N):
+                    Cont_t=Cont[self.N]
+                else:
+                    # 'contj-1' because we need the control at self.alltimes[i-1]
+                    delta0=(self.data_time_points[contj-1] -((self.k_j_list[contj-1])/self.N))
+                    Cont_t=((1-delta0)*Cont[self.k_j_list[contj-1]] + delta0*Cont[self.k_j_list[contj-1]+1]).copy()
 
 
             d_t=self.alltimes[i]-self.alltimes[i-1]
@@ -203,21 +208,99 @@ class FunctionalModulesGeom(Functional):
 
             GD+=d_t*self.Module.ApplyVectorField(GD,vect_field).copy()
 
-            I_t=self.image_domain.element(
-                _linear_deform(I_t,
-                               -d_t*vect_field)).copy()
+            vect_field_image=self.image_domain.tangent_bundle.element([vect_field[uu].interpolation(self.image_domain.points().T) for uu in range(self.image_domain.ndim)])
 
+            I_temp=self.image_domain.element(
+                _linear_deform(I_t,
+                               -d_t*vect_field_image)).copy()
+            I_t=I_temp.copy()
             if self.naturetime[i]==0:
-                # because for discretized integration only between 0 and N-1
-                if(contk<self.N):
-                    reg+= self.Module.Cost(GD,Cont_t)
+                # Now GD corresponds to contk + 1
                 contk+=1
+                # For discretized integration only between 0 and N-1
+                if(contk<self.N):
+                    reg+= self.Module.Cost(GD,Cont[contk])
             else:
                 attachment+=self.S[contj](I_t)
                 contj+=1
 
 
         return (self.lam/self.N)*reg+(1/(self.N+1))*attachment
+
+    def ComputeReg(self, X, out=None):
+
+        GD=X[0].copy() # initial GD
+        Cont=X[1].copy() # temporal list of controls
+
+        reg=0
+        contk=0
+        contj=0
+
+        Cont_t=Cont[0].copy()
+        # cost at time t=0
+        reg+= self.Module.Cost(GD,Cont_t)
+
+        for i in range(1,self.nb_data + self.N+1):
+            # iteration i starts with value at time self.alltimes[i-1]
+            # and ends with value at time self.alltimes[i]
+            if self.naturetime[i-1]==0:
+                Cont_t=Cont[contk].copy()
+            else:
+                if(self.k_j_list[contj]==self.N):
+                    Cont_t=Cont[self.N]
+                else:
+                    # 'contj-1' because we need the control at self.alltimes[i-1]
+                    delta0=(self.data_time_points[contj-1] -((self.k_j_list[contj-1])/self.N))
+                    Cont_t=((1-delta0)*Cont[self.k_j_list[contj-1]] + delta0*Cont[self.k_j_list[contj-1]+1]).copy()
+
+
+            d_t=self.alltimes[i]-self.alltimes[i-1]
+            vect_field=self.Module.ComputeField(GD,Cont_t).copy()
+
+            GD+=d_t*self.Module.ApplyVectorField(GD,vect_field).copy()
+
+            if self.naturetime[i]==0:
+                # Now GD corresponds to contk + 1
+                contk+=1
+                # For discretized integration only between 0 and N-1
+                if(contk<self.N):
+                    reg+= self.Module.Cost(GD,Cont[contk])
+
+
+
+        return (self.lam/self.N)*reg
+
+    def Shoot(self, X, out=None):
+
+        GD=X[0].copy() # initial GD
+        Cont=X[1].copy() # temporal list of controls
+
+        series_image_space_integration = ProductSpace(self.template.space,
+                                                  self.N+1)
+
+        I=series_image_space_integration.element()
+        I[0]=self.template.copy()
+
+
+        #Cont_t=Cont[0].copy()
+        # cost at time t=0
+
+        for i in range(self.N):
+
+            Cont_t=Cont[i].copy()
+
+            d_t=1/self.N
+            vect_field=self.Module.ComputeField(GD,Cont_t).copy()
+
+            GD+=d_t*self.Module.ApplyVectorField(GD,vect_field).copy()
+
+            vect_field_image=self.image_domain.tangent_bundle.element([vect_field[uu].interpolation(self.image_domain.points().T) for uu in range(self.image_domain.ndim)])
+
+            I[i+1]=self.image_domain.element(
+                _linear_deform(I[i],
+                               -d_t*vect_field_image)).copy()
+
+        return I
 
     def ComputetrajectoryGD(self,X):
 
@@ -230,6 +313,7 @@ class FunctionalModulesGeom(Functional):
         for i in range(self.N):
             vect_field=self.Module.ComputeField(GD_t[i],Cont_t[i]).copy()
             GD_t[i+1]=(GD_t[i] + self.inv_N*self.Module.ApplyVectorField(GD_t[i],vect_field)).copy()
+            #GD_t[i+1]=(GD_t[i] + self.inv_N*self.Module.ApplyModule(self.Module,GD_t[i],Cont_t[i])(GD_t[i])).copy()
 
         return GD_t
 
@@ -281,53 +365,66 @@ class FunctionalModulesGeom(Functional):
 
                     d_t=functional.alltimes[i]-functional.alltimes[i-1]
                     vect_field=functional.Module.ComputeField(GD_t,Cont_t).copy()
+                    vect_field_image=functional.image_domain.tangent_bundle.element([vect_field[uu].interpolation(functional.image_domain.points().T) for uu in range(functional.image_domain.ndim)])
 
                     if functional.naturetime[i]==0:
                         GD_tk[contk]=(GD_t+d_t*functional.Module.ApplyVectorField(GD_t,vect_field)).copy()
                         I_t=functional.image_domain.element(
                                 _linear_deform(I_t,
-                                   -functional.inv_N*vect_field)).copy()
+                                   -functional.inv_N*vect_field_image)).copy()
 
                         contk+=1
                     else:
                         image_data[contj]=functional.image_domain.element(
                                 _linear_deform(I_t,
-                                   -d_t*vect_field)).copy()
+                                   -d_t*vect_field_image)).copy()
 
                         GD_tj[contj]=(GD_t+d_t*functional.Module.ApplyVectorField(GD_t,vect_field)).copy()
                         contj+=1
 
                 # Computation of the derivative of gamma (trajectory of GD)
                 nX=len(functional.Module.basisGD)
-                gamma_derGD=odl.ProductSpace(
-                        odl.ProductSpace(functional.Module.GDspace,functional.N+1),
-                        nX).element()
+                #gamma_derGD=odl.ProductSpace(
+                #        odl.ProductSpace(functional.Module.GDspace,functional.N+1),
+                #        nX).element()
+                gamma_derGD=[]
                 nH=len(functional.Module.basisCont)
-                gamma_derCont=odl.ProductSpace(
-                        odl.ProductSpace(functional.Module.GDspace,functional.N+1),
-                        nH).element()
+                #gamma_derCont=odl.ProductSpace(
+                  #      odl.ProductSpace(functional.Module.GDspace,functional.N+1),
+                 #       nH).element()
+                gamma_derCont=[]
                 # generating nH elements of L^2([0,1],H) which are, constant
                 # equal to an element of the basis of H
-                basisContTraj=odl.ProductSpace(
-                        odl.ProductSpace(functional.Module.Contspace,functional.N+1),
-                        nH).element()
-
-                for i in range(nH):
-                    for u in range(functional.N+1):
-                        basisContTraj[i][u]=functional.Module.basisCont[i].copy()
+                #basisContTraj=odl.ProductSpace(
+                #        odl.ProductSpace(functional.Module.Contspace,functional.N+1),
+                #        nH).element()
+#                basisContTraj=[]
+#
+#                for i in range(nH):
+#                    temp=[]
+#                    for u in range(functional.N+1):
+#                        #basisContTraj[i][u]=functional.Module.basisCont[i].copy()
+#                        temp.append(functional.Module.basisCont[i].copy())
+#                    basisContTraj.append(temp.copy())
 
 
 
                 eps=0.001
+                gamma_init=functional.ComputetrajectoryGD([GD,Cont])
                 for i in range(nX):
                     GDtemp=(GD+ eps*functional.Module.basisGD[i]).copy()
                     Xtemp=[GDtemp,Cont.copy()]
-                    gamma_derGD[i]=functional.ComputetrajectoryGD(Xtemp)
+                    gamma_derGD.append((1/eps)*(functional.ComputetrajectoryGD(Xtemp)-gamma_init).copy())
+                    #gamma_derGD[i]=functional.ComputetrajectoryGD(Xtemp)
 
                 for i in range(nH):
-                    Conttemp=(Cont+ eps*basisContTraj[i]).copy()
+                    Conttemp=Cont.copy()
+                    Cont_basis=functional.Module.basisCont[i].copy()
+                    for u in range(functional.N+1):
+                        Conttemp[u]+=eps*Cont_basis.copy()
                     Xtemp=[GD.copy(),Conttemp]
-                    gamma_derCont[i]=functional.ComputetrajectoryGD(Xtemp)
+                    gamma_derCont.append((1/eps)*(functional.ComputetrajectoryGD(Xtemp)-gamma_init).copy())
+                    #gamma_derCont[i]=functional.ComputetrajectoryGD(Xtemp)
 
                 # define the gradients
                 grad1=odl.ProductSpace(functional.Module.Contspace,functional.N+1).zero()
@@ -336,9 +433,9 @@ class FunctionalModulesGeom(Functional):
 
 
                 # FFT setting for data matching term, 1 means 100% padding
-                padded_size = 2 * functional.image_domain.shape[0]
-                padded_ft_fit_op = padded_ft_op(functional.image_domain, padded_size)
-                vectorial_ft_fit_op = DiagonalOperator(*([padded_ft_fit_op] * dim))
+                #padded_size = 2 * functional.image_domain.shape[0]
+                #padded_ft_fit_op = padded_ft_op(functional.image_domain, padded_size)
+                #vectorial_ft_fit_op = DiagonalOperator(*([padded_ft_fit_op] * dim))
 
                 # Create the gradient op
                 grad_op = Gradient(domain=functional.image_domain, method='forward',pad_mode='symmetric')
