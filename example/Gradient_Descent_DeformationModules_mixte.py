@@ -1,13 +1,13 @@
 #%%
-GD_init=Module.GDspace.element([[[-0.5,-10]]])
-Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
+GD_init=Module.GDspace.element([[[0,-9.5]]])
+Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).one()
 
 #%% Naive Gradient descent : gradient computed by finite differences
 # Descent of vect field too
 # Descent for all times simultaneously
 #Combination of modules
 #functional=functionalF
-niter=13
+niter=150
 eps = 0.01
 
 X=functional_mod.domain.element([GD_init,Cont_init].copy())
