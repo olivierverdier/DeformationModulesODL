@@ -1,5 +1,6 @@
 #%%
-GD_init=Module.GDspace.element([[[-0.5,-10]]])
+GD_init=Module.GDspace.element([[[-0.0500, -9.5]]])
+GD_init=Module.GDspace.element([[[3,0]]])
 Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
 
 #%% Naive Gradient descent : gradient computed by finite differences
@@ -7,7 +8,7 @@ Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
 # Descent for all times simultaneously
 #Combination of modules
 #functional=functionalF
-niter=13
+niter=200
 eps = 0.01
 
 X=functional_mod.domain.element([GD_init,Cont_init].copy())
@@ -37,7 +38,7 @@ Types=[3]
 inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
-epsCont=0.05
+epsCont=0.01
 epsGD=0.000001
 eps_vect_field=0.01
 cont=1

@@ -100,6 +100,78 @@ def plot_grid(grid, skip):
         plt.plot(grid[0, :, i], grid[1, :, i], 'r', linewidth=0.5)
 
 
+def make_video_LDDMM(I,grid, outimg=None, fps=5, size=None,
+               is_color=True, format="XVID"):
+    """
+    Create a video from a list of images.
+ 
+    @param      outvid      output video
+    @param      images      list of images to use in the video
+    @param      fps         frame per second
+    @param      size        size of each frame
+    @param      is_color    color
+    @param      format      see http://www.fourcc.org/codecs.php
+    @return                 see http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_gui/py_video_display/py_video_display.html
+ 
+    The function relies on http://opencv-python-tutroals.readthedocs.org/en/latest/.
+    By default, the video will have the size of the first image.
+    It will resize every image to this size before adding them to the video.
+    """
+    from cv2 import VideoWriter, VideoWriter_fourcc, imread, resize
+    fourcc = VideoWriter_fourcc(*format)
+    vid = None
+    for image in images:
+        img = image.copy()
+        if vid is None:
+            if size is None:
+                size = img.shape[1], img.shape[0]
+            vid = VideoWriter(outvid, fourcc, float(fps), size, is_color)
+        if size[0] != img.shape[1] and size[1] != img.shape[0]:
+            img = resize(img, size)
+        vid.write(img)
+    vid.release()
+    return vid
+
+
+
+
+
+
+
+def make_video_path(images, outimg=None, fps=5, size=None,
+               is_color=True, format="XVID"):
+    """
+    Create a video from a list of images.
+ 
+    @param      outvid      output video
+    @param      images      list of images to use in the video
+    @param      fps         frame per second
+    @param      size        size of each frame
+    @param      is_color    color
+    @param      format      see http://www.fourcc.org/codecs.php
+    @return                 see http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_gui/py_video_display/py_video_display.html
+ 
+    The function relies on http://opencv-python-tutroals.readthedocs.org/en/latest/.
+    By default, the video will have the size of the first image.
+    It will resize every image to this size before adding them to the video.
+    """
+    from cv2 import VideoWriter, VideoWriter_fourcc, imread, resize
+    fourcc = VideoWriter_fourcc(*format)
+    vid = None
+    for image in images:
+        if not os.path.exists(image):
+            raise FileNotFoundError(image)
+        img = imread(image)
+        if vid is None:
+            if size is None:
+                size = img.shape[1], img.shape[0]
+            vid = VideoWriter(outvid, fourcc, float(fps), size, is_color)
+        if size[0] != img.shape[1] and size[1] != img.shape[0]:
+            img = resize(img, size)
+        vid.write(img)
+    vid.release()
+    return vid
+
 
 #
 
@@ -126,8 +198,8 @@ def plot_grid(grid, skip):
 
 
 
-I1name = '/home/bgris/Downloads/pictures/j.png'
-I0name = '/home/bgris/Downloads/pictures/v.png'
+I1name = 'bgris/Downloads/pictures/j.png'
+I0name = 'bgris/Downloads/pictures/v.png'
 I0 = np.rot90(plt.imread(I0name).astype('float'), -1)
 I1 = np.rot90(plt.imread(I1name).astype('float'), -1)
 
@@ -149,12 +221,12 @@ template = space.element(I0)
 
 
 ##### Cas shepp logan
-space = odl.uniform_discr(
-    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
-    dtype='float32', interp='linear')
-
-template= odl.phantom.shepp_logan(space)
-template.show(clim=[1,1.1])
+#space = odl.uniform_discr(
+#    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
+#    dtype='float32', interp='linear')
+#
+#template= odl.phantom.shepp_logan(space)
+#template.show(clim=[1,1.1])
 
 
 
@@ -179,31 +251,33 @@ forward_op=odl.IdentityOperator(space)
 
 
 
-#
-#
-## Give the number of directions
-#num_angles = 10
-#
-## Create the uniformly distributed directions
-#angle_partition = odl.uniform_partition(0.0, np.pi, num_angles,
-#                                    nodes_on_bdry=[(True, True)])
-#
-## Create 2-D projection domain
-## The length should be 1.5 times of that of the reconstruction space
-#detector_partition = odl.uniform_partition(-24, 24, int(round(space.shape[0]*np.sqrt(2))))
-#
-## Create 2-D parallel projection geometry
-#geometry = odl.tomo.Parallel2dGeometry(angle_partition, detector_partition)
-#
-## Ray transform aka forward projection. We use ASTRA CUDA backend.
-#forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
-#
-#
+
+
+# Give the number of directions
+num_angles = 10
+
+# Create the uniformly distributed directions
+angle_partition = odl.uniform_partition(0.0, np.pi, num_angles,
+                                    nodes_on_bdry=[(True, True)])
+
+# Create 2-D projection domain
+# The length should be 1.5 times of that of the reconstruction space
+detector_partition = odl.uniform_partition(-24, 24, int(round(space.shape[0]*np.sqrt(2))))
+
+# Create 2-D parallel projection geometry
+geometry = odl.tomo.Parallel2dGeometry(angle_partition, detector_partition)
+
+# Ray transform aka forward projection. We use ASTRA CUDA backend.
+##forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
+
+
 
 
 space = odl.uniform_discr(
     min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
     dtype='float32', interp='linear')
+forward_op=odl.IdentityOperator(space)
+
 
 template= odl.phantom.shepp_logan(space)
 #template.show(clim=[1,1.1])
@@ -211,18 +285,19 @@ template= odl.phantom.shepp_logan(space)
 
 template=template.space.element(scipy.ndimage.filters.gaussian_filter(template.asarray(),1.5))
 
-
-NRotation=1
-space_mod = odl.uniform_discr(
-    min_pt=[-16, -16], max_pt=[16, 16], shape=[256, 256],
-    dtype='float32', interp='nearest')
-
-kernelrot=Kernel.GaussianKernel(1.5)
-rotation=LocalRotation.LocalRotation(space_mod, NRotation, kernelrot)
-
-GD=rotation.GDspace.element([[-0.0500, -9.5]])
-Cont=rotation.Contspace.element([1])
-
+#
+#NRotation=1
+#space_mod = odl.uniform_discr(
+#    min_pt=[-16, -16], max_pt=[16, 16], shape=[256, 256],
+#    dtype='float32', interp='nearest')
+#
+#kernelrot=Kernel.GaussianKernel(3)
+#rotation=LocalRotation.LocalRotation(space_mod, NRotation, kernelrot)
+#
+#GD=rotation.GDspace.element([[-0.0500, -9.5]])
+##GD=rotation.GDspace.element([[-2.5,3.5]])
+#Cont=rotation.Contspace.element([1])
+#
 #I1=template.copy()
 #inv_N=1
 #for i in range(5):
@@ -231,8 +306,8 @@ Cont=rotation.Contspace.element([1])
 #                odl.deform.linearized._linear_deform(I1,
 #                               -inv_N * vect_field)).copy()
 #
-#I1.show(clim=[1 , 1.1])
-#
+#I1.show()
+
 
 ellipses= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
             [-.98, .6624, .8740, 0.0000, -.0184, 0],
@@ -241,9 +316,9 @@ ellipses= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
             [0.1, .2100, .2500, 0.0000, 0.3500, 0],
             [0.1, .0460, .0460, 0.0000, 0.1000, 0],
             [0.1, .0460, .0460, 0.0000, -.1000, 0],
-            [0.8, .0460, .0230, -.0800, -.6050, 0],
-            [0.8, .0230, .0230, 0.0000, -.6060, 0],
-            [0.8, .0230, .0460, 0.0600, -.6050, 0]]
+            [0.8, .0460, .0330, -.0800, -.6050, 0],
+            [0.8, .0330, .0330, 0.0000, -.6060, 0],
+            [0.8, .0330, .0460, 0.0600, -.6050, 0]]
 
 
 ellipses1= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
@@ -270,16 +345,63 @@ ellipses1= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
             [0.8, .0230, .0460, 0.01, -.560, 80]]
 
 
+ellipses1= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
+            [-.98, .6624, .8740, 0.0000, -.0184, 0],
+            [-.2, .1100, .3100, 0.2200, 0.0000, -18],
+            [-.2, .1600, .4100, -.2200, 0.0000, 18],
+            [0.1, .2100, .2500, 0.0000, 0.3500, 0],
+            [0.1, .0460, .0460, 0.0000, 0.1000, 0],
+            [0.1, .0460, .0460, 0.0000, -.1000, 0],
+            [0.8, .120, .0830, 0.0, -0.670, 0]]
+
+
+
 
 
 phantom=odl.phantom.geometric.ellipsoid_phantom(space,ellipses)
-#phantom.show()
+phantom.show()
 
 template=template.space.element(scipy.ndimage.filters.gaussian_filter(phantom.asarray(),1.5))
 
-I1=odl.phantom.geometric.ellipsoid_phantom(space,ellipses1)
+
+
+
+NRotation=1
+space_mod = odl.uniform_discr(
+    min_pt=[-16, -16], max_pt=[16, 16], shape=[256, 256],
+    dtype='float32', interp='nearest')
+
+kernelrot=Kernel.GaussianKernel(5)
+rotation=LocalRotation.LocalRotation(space_mod, NRotation, kernelrot)
+
+#GD=rotation.GDspace.element([[-0.0500, -9.5]])
+GD=rotation.GDspace.element([[3,0]])
+Cont=rotation.Contspace.element([0.4])
+
+I1=template.copy()
+inv_N=1
+for i in range(5):
+    vect_field=rotation.ComputeField(GD,Cont).copy()
+    I1=template.space.element(
+                odl.deform.linearized._linear_deform(I1,
+                               -inv_N * vect_field)).copy()
+
+NAffine=2
+kernelaff=Kernel.GaussianKernel(3)
+affine=UnconstrainedAffine.UnconstrainedAffine(space_mod, NAffine, kernelaff)
+
+GD_affine=affine.GDspace.element([[-5,5],[3,4]])
+Cont_affine=-1*affine.Contspace.element([[[0.5,0],[1,-1],[1,1]],[[-1,0.5],[-1,0],[0.5,0]]])
+vect_field_affine=affine.ComputeField(GD_affine,Cont_affine)
+
+I1=I1=template.space.element(odl.deform.linearized._linear_deform(I1.copy(),vect_field_affine))
+
+
+
+
+#I1=odl.phantom.geometric.ellipsoid_phantom(space,ellipses1)
 #I1.show(clim=[1 , 1.1])
-I1=template.space.element(scipy.ndimage.filters.gaussian_filter(I1.asarray(),1.5))
+#I1=template.space.element(scipy.ndimage.filters.gaussian_filter(I1,1.5))
 
 template.show()
 I1.show()
@@ -324,7 +446,7 @@ affine=UnconstrainedAffine.UnconstrainedAffine(space_mod, NAffine, kernelaff)
 
 #scaling=LocalScaling.LocalScaling(space_mod, NScaling, kernel)
 
-kernelrot=Kernel.GaussianKernel(3)
+kernelrot=Kernel.GaussianKernel(5)
 rotation=LocalRotation.LocalRotation(space_mod, NRotation, kernelrot)
 
 #Module=DeformationModuleAbstract.Compound([translation,rotation])
@@ -332,31 +454,31 @@ Module=DeformationModuleAbstract.Compound([rotation])
 #ModuleF=translationF
 #Module=affine
 #Module=DeformationModuleAbstract.Compound([translation,translation])
-
-#%%
-nb_time_point_int=10
-GD=Module.GDspace.element([[[-0.5,-10]]])
-Cont=5*odl.ProductSpace(Module.Contspace,nb_time_point_int+1).one()
-
-X=functional_mod.domain.element([GD,Cont].copy())
-
-vector_fields_list=energy_op_lddmm.domain.zero()
-
-I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
-I_t[0].show()
-I_t[nb_time_point_int].show()
-I1=I_t[nb_time_point_int].copy()
-
-GD_affine=affine.GDspace.element([[-2,-4],[3,4]])
-Cont_affine=-1*affine.Contspace.element([[[1,0],[1,-1],[0,1]],[[-1,0.5],[-1,0],[0.5,0]]])
-vect_field_affine=affine.ComputeField(GD_affine,Cont_affine)
-
-I1=odl.deform.linearized._linear_deform(I_t[nb_time_point_int],vect_field_affine)
-I1=template.space.element(I1)
-I1.show()
-template.show()
+#
+##%%
+#nb_time_point_int=10
+#GD=Module.GDspace.element([[[-0.5,-10]]])
+#Cont=5*odl.ProductSpace(Module.Contspace,nb_time_point_int+1).one()
+#
+#X=functional_mod.domain.element([GD,Cont].copy())
+#
+#vector_fields_list=energy_op_lddmm.domain.zero()
+#
+#I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
+#I_t[0].show()
+#I_t[nb_time_point_int].show()
+#I1=I_t[nb_time_point_int].copy()
+#
+#GD_affine=affine.GDspace.element([[-2,-4],[3,4]])
+#Cont_affine=-1*affine.Contspace.element([[[1,0],[1,-1],[0,1]],[[-1,0.5],[-1,0],[0.5,0]]])
+#vect_field_affine=affine.ComputeField(GD_affine,Cont_affine)
+#
+#I1=odl.deform.linearized._linear_deform(I_t[nb_time_point_int],vect_field_affine)
+#I1=template.space.element(I1)
+#I1.show()
+#template.show()
 #%% Define functional
-lam=0.01
+lam=0.0001
 nb_time_point_int=10
 #template=I0
 
@@ -377,7 +499,7 @@ nb_time_point_int=10
 #              (image_N0[0]),(image_N0[10])]
 
 lamb0=1e-7
-lamb1=1e-4
+lamb1=1e-2
 import scipy
 data_time_points=np.array([1])
 data_space=odl.ProductSpace(forward_op.range,data_time_points.size)
@@ -393,7 +515,7 @@ functional_mod = TemporalAttachmentModulesGeom.FunctionalModulesGeom(lamb0, nb_t
 
 
 # The parameter for kernel function
-sigma = 0.5
+sigma = 1
 
 # Give kernel function
 def kernel_lddmm(x):
@@ -444,7 +566,7 @@ def grad_attach_vector_field(vect_field_list,GD,Cont):
 def ComputeGD_mixt(vect_field_list,GD,Cont):
     GD_list=[]
     GD_list.append(GD.copy())
-    vect_field_list_mixt=Mix_vect_field(vect_field_list,GD_init,Cont)
+    vect_field_list_mixt=Mix_vect_field(vect_field_list,GD,Cont)
     for i in range(nb_time_point_int):
         GD_temp=GD_list[i].copy()
         GD_temp+=(1/nb_time_point_int)*functional_mod.Module.ApplyVectorField(GD_temp,vect_field_list_mixt[i])
@@ -490,19 +612,64 @@ for t in range(nb_time_point_int+1):
     grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
     plot_grid(grid, 5)
 #
+#%% save images  LDDMM
+I_t=odl.deform.ShootTemplateFromVectorFields(vector_fields_list_load, template)
 
+grid_points=compute_grid_deformation_list(vector_fields_list, 1/nb_time_point_int, template.space.points().T)
+
+for t in range(nb_time_point_int+1):
+    plt.figure()
+    #t=nb_time_point_int
+    I_t[t].show('LDDMM time {}'.format(t+1))
+    grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
+    plot_grid(grid, 5)
+    plt.savefig('LDDMM_bis_time{}.png'.format(t+1))
+#
+
+
+#%% video lddmm
+I_t=odl.deform.ShootTemplateFromVectorFields(vector_fields_list_load, template)
+
+grid_points=compute_grid_deformation_list(vector_fields_list, 1/nb_time_point_int, template.space.points().T)
+
+from cv2 import VideoWriter, VideoWriter_fourcc, imread, resize
+format="XVID"
+outimg=None
+size=None
+fps=5
+is_color=True
+fourcc = VideoWriter_fourcc(*format)
+vid = None
+for t in range(nb_time_point_int+1):
+    img=plt.figure()
+    I_t[t].show('LDDMM time {}'.format(t+1))
+    grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
+    plot_grid(grid, 5)
+    plt.savefig('LDDMMtime{}.pdf'.format(t+1))
+    if vid is None:
+        if size is None:
+            size = I_t[t].shape[1], I_t[t].shape[0]
+        vid = VideoWriter("LDDMM_video.avi", fourcc, float(fps), size, is_color)
+    if size[0] != I_t[t].shape[1] and size[1] != I_t[t].shape[0]:
+        img = resize(img, size)
+    vid.write(img)
+vid.release()
+
+
+
+#%%
 #Saving results in files
 for t in range(nb_time_point_int+1):
-    np.savetxt('/home/bgris/odl/examples/Mixed_SL/LDDMM_Vector_Field_time_{}'.format(t),vector_fields_list[t])
-    np.savetxt('/home/bgris/odl/examples/Mixed_SL/LDDMM_Deformed_Grid_time_{}'.format(t),grid_points[t])
+    np.savetxt('odl/examples/Mixed_SL/LDDMM_bis__Vector_Field_time_{}'.format(t),vector_fields_list[t])
+    np.savetxt('odl/examples/Mixed_SL/LDDMM_bis__Deformed_Grid_time_{}'.format(t),grid_points[t])
 
 
-# Load data
+#%% Load data
 vector_fields_list_load=energy_op_lddmm.domain.zero()
 grid_load=[]
 for t in range(nb_time_point_int+1):
-    vector_fields_list_load[t]=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/LDDMM_Vector_Field_time_{}'.format(t))).copy()
-    grid_t=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/LDDMM_Deformed_Grid_time_{}'.format(t))).copy()
+    vector_fields_list_load[t]=template.space.tangent_bundle.element(np.loadtxt('odl/examples/Mixed_SL/LDDMM_bis__Vector_Field_time_{}'.format(t))).copy()
+    grid_t=template.space.tangent_bundle.element(np.loadtxt('odl/examples/Mixed_SL/LDDMM_bis__Deformed_Grid_time_{}'.format(t))).copy()
     grid_load.append(np.array(grid_t).copy())
 
 
@@ -510,32 +677,51 @@ for t in range(nb_time_point_int+1):
 I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
 
 vector_fields_list_tot=Mix_vect_field(vector_fields_list,X[0],X[1])
-grid_points=compute_grid_deformation_list_bis(vector_fields_list_tot, 1/nb_time_point_int, template.space.points().T)
+grid_points=compute_grid_deformation_list(vector_fields_list_tot, 1/nb_time_point_int, template.space.points().T)
 
 for t in range(nb_time_point_int+1):
     #t=nb_time_point_int
-    I_t[t].show('Modular time {}'.format(t+1))
+    I_t[t].show('Mixed strategy time {}'.format(t+1))
     grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
     plot_grid(grid, 5)
 #
+#%% save images  Mixed strategy
+I_t=odl.deform.ShootTemplateFromVectorFields(vector_fields_list_tot, template)
 
+grid_points=compute_grid_deformation_list(vector_fields_list, 1/nb_time_point_int, template.space.points().T)
+
+for t in range(nb_time_point_int+1):
+    plt.figure()
+    #t=nb_time_point_int
+    I_t[t].show('Mixed strategy time {}'.format(t+1))
+    grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
+    plot_grid(grid, 5)
+    plt.savefig('Mixed_bis_ strategy time {}.pdf'.format(t+1))
+#
+#%%
 #Saving results in files
 for i in range(NbMod):
-    np.savetxt('/home/bgris/odl/examples/Mixed_SL/Mixed_GD_time_0_Mod_{}'.format(i),np.asarray(X[0][0]))
+    np.savetxt('odl/examples/Mixed_SL/Mixed_bis__GD_time_0_Mod_{}'.format(i),np.asarray(X[0][0]))
 for t in range(nb_time_point_int+1):
     for i in range(NbMod):
-        np.savetxt('/home/bgris/odl/examples/Mixed_SL/Mixed_Cont_time_{}_Mod_{}'.format(t,i),X[1][t][i])
-    np.savetxt('/home/bgris/odl/examples/Mixed_SL/Mixed_Vector_Field_time_{}'.format(t),vector_fields_list[t])
-    np.savetxt('/home/bgris/odl/examples/Mixed_SL/Mixed_Deformed_Grid_time_{}'.format(t),grid_points[t])
+        np.savetxt('odl/examples/Mixed_SL/Mixed_bis__Cont_time_{}_Mod_{}'.format(t,i),X[1][t][i])
+    np.savetxt('odl/examples/Mixed_SL/Mixed_bis__Vector_Field_time_{}'.format(t),vector_fields_list[t])
+    np.savetxt('odl/examples/Mixed_SL/Mixed_bis__Deformed_Grid_time_{}'.format(t),grid_points[t])
 
 
-# Load data
+#%% Load data
 vector_fields_list_load=energy_op_lddmm.domain.zero()
+X=functional_mod.domain.element()
 grid_load=[]
+for i in range(NbMod):
+    X[0][i][0]=np.loadtxt('odl/examples/Mixed_SL/Mixed_bis__GD_time_0_Mod_{}'.format(i)).copy()
+    
 for t in range(nb_time_point_int+1):
-    vector_fields_list_load[t]=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/Mixed_Vector_Field_time_{}'.format(t))).copy()
-    grid_t=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/MixedDeformed_Grid_time_{}'.format(t))).copy()
-    grid_load.append(np.array(grid_t).copy())
+    for i in range(NbMod):
+        X[1][t][i]=np.loadtxt('odl/examples/Mixed_SL/Mixed_bis__Cont_time_{}_Mod_{}'.format(t,i)).copy()
+    vector_fields_list_load[t]=template.space.tangent_bundle.element(np.loadtxt('odl/examples/Mixed_SL/Mixed_bis__Vector_Field_time_{}'.format(t))).copy()
+#    #grid_t=template.space.tangent_bundle.element(np.loadtxt('/home/bgris/odl/examples/Mixed_SL/MixedDeformed_Grid_time_{}'.format(t))).copy()
+    #grid_load.append(np.array(grid_t).copy())
 
 #%%
 GD_init=Module.GDspace.element([[[0,-10]]])
