@@ -210,8 +210,11 @@ for n in range(nb_data):
     space.element(temp).show('Transported source {}'.format(n))
 #
 
+#%% Save vector field estimated
 
-
+np.savetxt('/home/barbara/DeformationModulesODL/example/vect_field_ellipses',X[0][0])
+   
+vect_field=space.tangent_bundle.element(np.loadtxt('/home/barbara/DeformationModulesODL/example/vect_field_ellipses')).copy()
 
 
 

@@ -113,6 +113,7 @@ class DeformationModule(object):
 
         self.GDspace=GDspace
         self.Contspace=Contspace
+        self.domain=DomainField
         #print(1)
         for i in range(len(basisGD)):
              #print(i)

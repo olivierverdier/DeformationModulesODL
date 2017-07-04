@@ -25,6 +25,7 @@ from DeformationModulesODL.deform import SumTranslations
 from DeformationModulesODL.deform import UnconstrainedAffine
 from DeformationModulesODL.deform import LocalScaling
 from DeformationModulesODL.deform import LocalRotation
+from DeformationModulesODL.deform import EllipseMvt
 from DeformationModulesODL.deform import TemporalAttachmentModulesGeom
 
 import scipy
@@ -228,7 +229,24 @@ template = space.element(I0)
 #template= odl.phantom.shepp_logan(space)
 #template.show(clim=[1,1.1])
 
+#### Cas ellipse
 
+space=odl.uniform_discr(
+    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
+    dtype='float32', interp='linear')
+
+
+a_list=[0.2,0.4,0.6,0.8,1]
+b_list=[1,0.8,0.6,0.4,0.2]
+fac=0.3
+nb_ellipses=len(a_list)
+images_ellipses=[]
+for i in range(nb_ellipses):
+    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.0000, 0.0000, 0]]
+    images_ellipses.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+I0=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[0].asarray(),3))
+I1=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[nb_ellipses-1].asarray(),3))
+template=I0
 
 # Give the number of directions
 num_angles = 10
@@ -272,14 +290,14 @@ geometry = odl.tomo.Parallel2dGeometry(angle_partition, detector_partition)
 
 
 
-
-space = odl.uniform_discr(
-    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
-    dtype='float32', interp='linear')
-forward_op=odl.IdentityOperator(space)
-
-
-template= odl.phantom.shepp_logan(space)
+#
+#space = odl.uniform_discr(
+#    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
+#    dtype='float32', interp='linear')
+#forward_op=odl.IdentityOperator(space)
+#
+#
+#template= odl.phantom.shepp_logan(space)
 #template.show(clim=[1,1.1])
 
 
@@ -421,6 +439,7 @@ Ntrans=1
 NAffine=2
 NScaling=3
 NRotation=1
+NEllipse=1
 ##
 #miniX=-5
 #maxiX=5
@@ -449,8 +468,13 @@ affine=UnconstrainedAffine.UnconstrainedAffine(space_mod, NAffine, kernelaff)
 kernelrot=Kernel.GaussianKernel(5)
 rotation=LocalRotation.LocalRotation(space_mod, NRotation, kernelrot)
 
+
+kernelelli=Kernel.GaussianKernel(2)
+Name='DeformationModulesODL/deform/vect_field_ellipses'
+elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
+
 #Module=DeformationModuleAbstract.Compound([translation,rotation])
-Module=DeformationModuleAbstract.Compound([rotation])
+Module=DeformationModuleAbstract.Compound([elli])
 #ModuleF=translationF
 #Module=affine
 #Module=DeformationModuleAbstract.Compound([translation,translation])
@@ -532,7 +556,6 @@ energy_op_lddmm=odl.deform.TemporalAttachmentLDDMMGeom(nb_time_point_int, templa
 Reg=odl.deform.RegularityLDDMM(kernel_lddmm,energy_op_lddmm.domain)
 
 functional_lddmm=energy_op_lddmm + lamb1*Reg
-
 
 def Mix_vect_field(vect_field_list,GD_init,Cont):
     space_pts=template.space.points()
