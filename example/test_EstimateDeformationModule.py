@@ -130,7 +130,6 @@ elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
 #Module=DeformationModuleAbstract.Compound([translation,rotation])
 Module=DeformationModuleAbstract.Compound([elli])
 
-#%%
 
 #%% Define functional
 lam=0.0001
@@ -231,10 +230,10 @@ def ComputeModularVectorFields(vect_field_list,GD,Cont):
 
 #%%
 #GD_init=Module.GDspace.zero()
-GD_init=Module.GDspace.element([[1,1]])
+GD_init=Module.GDspace.element([[-0.2, 0.4]])
 Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
 
-niter=50
+niter=500
 eps = 0.01
 
 X=functional_mod.domain.element([GD_init,Cont_init].copy())
@@ -258,15 +257,15 @@ delta=0.1
 epsmax=1
 deltamin=0.1
 deltaCont=0.1
-deltaGD=0.1
+deltaGD=0.2
 # 0=SumTranslations, 1=affine, 2=scaling, 3=rotation, 4 = ellipsemvt
 Types=[4]
 #energy=functional(X)+1
 inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
-epsCont=0.0001
-epsGD=0.000001
+epsCont=0.01
+epsGD=0.001
 eps_vect_field=0.01
 cont=1
 space_pts=template.space.points()
@@ -274,6 +273,9 @@ space_pts=template.space.points()
 GD=ComputeGD_mixt(vector_fields_list,X[0],X[1]).copy()
 
 for k in range(niter):
+    gradGD=functional_mod.Module.GDspace.zero()
+    gradCont=odl.ProductSpace(functional_mod.Module.Contspace,nb_time_point_int+1).zero()
+
     energy=attach_tot(vector_fields_list,X[0],X[1])
     Reg_mod=functional_mod.ComputeReg(X)
     energy_mod=Reg_mod+energy
@@ -299,16 +301,15 @@ for k in range(niter):
             for t in range(nb_time_point_int):
                 X_temp=X.copy()
                 X_temp[1][t][i]+=deltaCont*basisCont[iter_cont]
-                GD_diff=ComputeGD_mixt(vector_fields_list,X[0],X_temp[1])
+                GD_diff=ComputeGD_mixt(vector_fields_list,X[0],X_temp[1]).copy()
                 temp=0
                 #print('t = {}'.format(t))
                 for s in range(nb_time_point_int):
                     # vec_temp is the derivative of the generated vector field at s with respect to h[t][iter_cont]
-                    vec_temp=( Module.ComputeField(GD_diff[t], X_temp[1][t])-Module.ComputeField(GD[t], X[1][t]) )/deltaCont
+                    vec_temp=( Module.ComputeField(GD_diff[s], X_temp[1][s]).copy()-Module.ComputeField(GD[s], X[1][s]).copy() )/deltaCont
                     
                     # It is necessary to interpolate in order to do the inner product
-                    vec_temp_interp=space.tangent_bundle.element(
-                            [vec_temp[u].interpolation(space_pts.T) for u in range(dim)]).copy()
+                    vec_temp_interp=space.tangent_bundle.element(vec_temp).copy()
                     
                     temp+=inv_N*grad_vect_field[s].inner(vec_temp_interp)
                     #print('s = {}'.format(s))
@@ -324,21 +325,76 @@ for k in range(niter):
         for iter_gd in range(dimGD):
             X_temp=X.copy()
             X_temp[0][i]+=deltaGD*basisGD[iter_gd]
-            GD_diff=ComputeGD_mixt(vector_fields_list,X_temp[0],X_temp[1])
+            GD_diff=ComputeGD_mixt(vector_fields_list,X_temp[0],X_temp[1]).copy()
+            temp=0
             for s in range(nb_time_point_int):
                 # vec_temp is the derivative of the generated vector field at s with respect to GD[iter_cont]
-                vec_temp=( Module.ComputeField(GD_diff[t], X_temp[1][t])-Module.ComputeField(GD[t], X[1][t]) )/deltaGD
+                vec_temp=( Module.ComputeField(GD_diff[s], X_temp[1][s]).copy()-Module.ComputeField(GD[s], X[1][s]).copy() )/deltaGD
                  
                 # It is necessary to interpolate in order to do the inner product
-                vec_temp_interp=space.tangent_bundle.element(
-                        [vec_temp[u].interpolation(space_pts.T) for u in range(dim)]).copy()
+                vec_temp_interp=space.tangent_bundle.element(vec_temp).copy()
+                        #[vec_temp[u].interpolation(space_pts.T) for u in range(dim)]).copy()
                 
                 temp+=inv_N*grad_vect_field[s].inner(vec_temp_interp)
-            gradGD[i][iter_cont]+=temp
+            gradGD[i][iter_gd]+=temp
 
-    X[1]-=epsCont*gradCont.copy()
+    for ite in range(10):
+        X_temp=X.copy()
+        X_temp[1]-=epsCont*gradCont.copy()
+        X_temp[0]-=epsGD*gradGD
+        energy=attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+        Reg_mod=functional_mod.ComputeReg(X)
+        energy_mod0=Reg_mod+energy
+
+        X_temp=X.copy()
+        X_temp[1]-=0.8*epsCont*gradCont.copy()
+        X_temp[0]-=epsGD*gradGD
+        energy=attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+        Reg_mod=functional_mod.ComputeReg(X)
+        energy_mod1=Reg_mod+energy
+
+        X_temp=X.copy()
+        X_temp[1]-=epsCont*gradCont.copy()
+        X_temp[0]-œ=0.8*epsGD*gradGD
+        energy=attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+        Reg_mod=functional_mod.ComputeReg(X)
+        energy_mod2=Reg_mod+energy
+        print('energy0 = {}, energy1 = {}, energy2 = {} '.format(energy_mod0,energy_mod1,energy_mod2) )
+        if (energy_mod0 <= energy_mod1 and energy_mod0 <= energy_mod2):
+            X_temp=X.copy()
+            X_temp[1]-=epsCont*gradCont.copy()
+            X_temp[0]-=epsGD*gradGD
+            energy_mod_temp=energy_mod0
+        elif (energy_mod1 <= energy_mod0 and energy_mod1 <= energy_mod2):
+            X_temp=X.copy()
+            X_temp[1]-=0.8*epsCont*gradCont.copy()
+            X_temp[0]-=epsGD*gradGD
+            energy_mod_temp=energy_mod1   
+            epsCont*=0.8
+        else:
+            X_temp=X.copy()
+            X_temp[1]-=epsCont*gradCont.copy()
+            X_temp[0]-=0.8*epsGD*gradGD
+            energy_mod_temp=energy_mod2
+            epsGD*=0.8
+                
+        if (energy_mod_temp < energy_mod):
+            X=X_temp.copy()
+            epsGD*=1.2
+            epsCont*=1.2
+            break
+        else:
+           epsGD*=0.8
+           epsCont*=0.8
+        
+    if (ite==9):
+        print('No possible to descent')
+        break
+    #X[1]-=epsCont*gradCont.copy()
     print(X[1][0])
-    X[0]-=epsGD*gradGD
+    #X[0]-=epsGD*gradGD
+    print([X[0]])
+    print('epsGD= {} , epsCont = {}'.format(epsGD,epsCont))
     #vector_fields_list=((1-eps_vect_field*lamb1)*vector_fields_list-eps_vect_field*grad_vect_field ).copy()
 #
 

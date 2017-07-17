@@ -134,7 +134,7 @@ class EllipseMvt(DeformationModule):
                 raise TypeError(' h is not in `Contspace` instance'
                             '')
 
-        temp=self.DomainField.tangent_bundle.element([self.DomainField.zero() - o[i] for i in range(self.dim)])
+        temp=self.DomainField.tangent_bundle.element([self.DomainField.zero() - o[i] for i in range(self.dim)]).copy()
         # the control h is of dimension 1
         vector_field=h[0]*self.DomainField.tangent_bundle.element([_linear_deform(self.vect_field[d],temp) for d in range(self.dim)]).copy()
 
