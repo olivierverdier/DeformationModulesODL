@@ -88,7 +88,7 @@ def Rtheta(theta,points):
     points_rot[1]=np.sin(theta)*points.T[0].copy() + np.cos(theta)*points.T[1].copy()
     
     return points_rot.T.copy()
-    
+    points.T[0]
 def Rprimetheta(theta,points):
     # theta is the angle, in rad
     # input = list of points, for ex given by space.points() or 
@@ -293,12 +293,12 @@ def energyRigid_gradient(source_list, target_list,kernel, forward_op,norm, X, la
         
         
         
-    grad_alpha.append(temp_grad_alpha.copy())
+    grad_alpha=temp_grad_alpha.copy()
     grad_vect=temp_grad_vect.copy()
-    grad_angle.append(temp_grad_angle.copy())
-    grad_center.append(temp_grad_center.copy())
+    grad_angle=temp_grad_angle.copy()
+    grad_center=temp_grad_center.copy()
 
-    return [grad_vect,grad_alpha]
+    return [grad_vect,grad_alpha,grad_center,grad_angle]
 #
 #%%
 
@@ -348,9 +348,12 @@ niter=100
 eps=0.02
 for i in range(niter):
     grad=energyRigid_gradient(source_list, target_list,kernel, forward_op,norm, X, lamalpha, lamv)
-    X[0]=[X[0][k] - eps*grad[0][k] for k in range(nb_vect_fields)].copy()
-    X[1]=[[X[1][k][n] - eps*grad[1][k][n] for n in range(nb_data)] for k in range(nb_vect_fields)]
-    ener=energy(source_list, target_list,kernel, forward_op,norm, X, lamalpha, lamv)
+    X[0]=X[0] - eps*grad[0].copy()
+    X[1]=np.array(X[1]) - eps*np.array(grad[1])
+    X[2]=[np.array(X[2][i])- eps*np.array(grad[2][i]) for i in range(nb_data)]
+    X[3]=[np.array(X[3][i]) - eps*np.array(grad[3][i]) for i in range(nb_data)]
+    
+    ener=energyRigid(source_list, target_list,kernel, forward_op,norm, X, lamalpha, lamv)
     print('Iter = {},  energy = {}'.format(i,ener))
 #
 #%%
