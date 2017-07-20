@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Thu Jul 20 15:56:29 2017
+
+@author: barbara
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Tue Jul  4 11:15:37 2017
 
 @author: barbara
@@ -126,18 +134,33 @@ NEllipse=1
 
 kernelelli=Kernel.GaussianKernel(2)
 Name='DeformationModulesODL/deform/vect_field_ellipses'
-
-#elli=FromFile.FromFile(space_mod, Name, kernelelli)
-elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
+update=[1,0]
+elli=FromFile.FromFile(space_mod, Name, kernelelli,update)
+#elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
 
 #Module=DeformationModuleAbstract.Compound([translation,rotation])
 Module=DeformationModuleAbstract.Compound([elli])
 
 #GD_init=Module.GDspace.zero()
-GD_init=Module.GDspace.element([[[-0.2, 0.4],0]])
+GD_init=Module.GDspace.element([[[0,0],0.3*np.pi]])
+#GD_init=Module.GDspace.element([[-0.2, 0.4]])
+Cont_init=Module.Contspace.one()
 Cont_init=Module.Contspace.zero()
-
 #Module.ComputeFieldDer(GD_init, Cont_init)(GD_init)
+points=space.points()
+v0=elli.vect_field
+plt.figure()
+plt.quiver(points.T[0][::20],points.T[1][::20],v0[0][::20],v0[1][::20])
+plt.axis('equal')
+plt.title('Elli')
+
+v=Module.ComputeField(GD_init,Cont_init)
+plt.figure()
+plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
+plt.axis('equal')
+plt.title('Rotated')
+
+
 #%% Define functional
 lam=0.0001
 nb_time_point_int=10
@@ -153,7 +176,7 @@ forward_operators=[forward_op]
 
 Norm=odl.solvers.L2NormSquared(forward_op.range)
 
-functional_mod = TemporalAttachmentModulesGeom.FunctionalModulesGeom(lamb0, nb_time_point_int, template00, data, data_time_points, forward_operators,Norm, Module)
+functional_mod = TemporalAttachmentModulesGeom.FunctionalModulesGeom(lamb0, nb_time_point_int, template, data, data_time_points, forward_operators,Norm, Module)
 
 
 
@@ -167,7 +190,7 @@ def kernel_lddmm(x):
 
 
 # Define energy operator
-energy_op_lddmm=odl.deform.TemporalAttachmentLDDMMGeom(nb_time_point_int, template00 ,data,
+energy_op_lddmm=odl.deform.TemporalAttachmentLDDMMGeom(nb_time_point_int, template ,data,
                             data_time_points, forward_operators,Norm, kernel_lddmm,
                             domain=None)
 
@@ -188,6 +211,21 @@ def Mix_vect_field(vect_field_list,GD_init,Cont):
 
     return vect_field_list_tot
 
+
+def vect_field_list(GD_init,Cont):
+    space_pts=template.space.points()
+    GD=GD_init.copy()
+    vect_field_list_tot=[]
+    for i in range(nb_time_point_int+1):
+        vect_field_mod=functional_mod.Module.ComputeField(GD,Cont[i]).copy()
+        vect_field_list_interp=template.space.tangent_bundle.element([vect_field_mod[u].interpolation(space_pts.T) for u in range(dim)]).copy()
+        GD+=(1/nb_time_point_int)*functional_mod.Module.ApplyVectorField(GD,vect_field_list_interp).copy()
+        vect_field_list_tot.append(vect_field_list_interp)
+
+    return odl.ProductSpace(template.space.tangent_bundle,nb_time_point_int+1).element(vect_field_list_tot)
+
+
+
 def Shoot_mixt(vect_field_list,GD,Cont):
     vect_field_list_mod=Mix_vect_field(vect_field_list,GD,Cont).copy()
     I=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_list_mod, template)
@@ -197,40 +235,46 @@ def attach_tot(vect_field_list,GD,Cont):
     I=Shoot_mixt(vect_field_list,GD,Cont)
     return Norm(forward_operators[0](I[nb_time_point_int])-data[0])
 
+def attach_mod(GD,Cont):
+    vect_field_list_mod=vect_field_list(GD,Cont)
+    I=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_list_mod, template)
+    return Norm(forward_operators[0](I[nb_time_point_int])-data[0])
 
 
-def grad_attach_vector_field(vect_field_list,GD,Cont):
-    vect_field_list_tot=Mix_vect_field(vect_field_list,GD,Cont)
+
+
+def grad_attach_vector_field(GD,Cont):
+    vect_field_list_tot=vect_field_list(GD,Cont)
     grad=energy_op_lddmm.gradient(vect_field_list_tot).copy()
     return grad
 #
 
-def grad_attach_vector_fieldL2(vect_field_list,GD,Cont):
-    vect_field_list_tot=Mix_vect_field(vect_field_list,GD,Cont)
+def grad_attach_vector_fieldL2(GD,Cont):
+    vect_field_list_tot=vect_field_list(GD,Cont)
     grad=energy_op_lddmm.gradientL2(vect_field_list_tot).copy()
     return grad
 #
 
-def ComputeGD_mixt(vect_field_list,GD,Cont):
+def ComputeGD_list(GD,Cont):
     GD_list=[]
     GD_list.append(GD.copy())
-    vect_field_list_mixt=Mix_vect_field(vect_field_list,GD,Cont)
     for i in range(nb_time_point_int):
         GD_temp=GD_list[i].copy()
-        GD_temp+=(1/nb_time_point_int)*functional_mod.Module.ApplyVectorField(GD_temp,vect_field_list_mixt[i])
+        vect_field=functional_mod.Module.ComputeField(GD_temp,Cont[i]).copy()
+        GD_temp+=(1/nb_time_point_int)*functional_mod.Module.ApplyVectorField(GD_temp,vect_field)
         GD_list.append(GD_temp.copy())
 
     return GD_list.copy()
 #
 
 
-def ComputeModularVectorFields(vect_field_list,GD,Cont):
-    GD_list=ComputeGD_mixt(vect_field_list,GD,Cont)
-    vect_field_list_tot=[]
-    for i in range(nb_time_point_int+1):
-        vect_field_list_tot.append(functional_mod.Module.ComputeField(GD_list[i],Cont[i]))
-
-    return vect_field_list_tot
+#def ComputeModularVectorFields(vect_field_list,GD,Cont):
+#    GD_list=ComputeGD_mixt(vect_field_list,GD,Cont)
+#    vect_field_list_tot=[]
+#    for i in range(nb_time_point_int+1):
+#        vect_field_list_tot.append(functional_mod.Module.ComputeField(GD_list[i],Cont[i]))
+#
+#    return vect_field_list_tot
 #
 
 
@@ -272,14 +316,13 @@ inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
 epsCont=0.01
-epsGD=0.00
+epsGD=0.001
 eps_vect_field=0.01
 cont=1
 space_pts=template.space.points()
 
-GD=ComputeGD_mixt(vector_fields_list,X[0],X[1]).copy()
 
-energy=attach_tot(vector_fields_list,X[0],X[1])
+energy=attach_mod(X[0],X[1])
 Reg_mod=functional_mod.ComputeReg(X)
 energy_mod=Reg_mod+energy
 print('Initial  energy = {} '.format(energy_mod))
@@ -290,10 +333,10 @@ for k in range(niter):
     #energy=attach_tot(vector_fields_list,X[0],X[1])
     #Reg_mod=functional_mod.ComputeReg(X)
     #energy_mod=Reg_mod+energy
-    GD=ComputeGD_mixt(vector_fields_list,X[0],X[1]).copy()
+    GD=ComputeGD_list(X[0],X[1]).copy()
     #print('k={}  before vect field attachment term = {}, reg_mod={}'.format(k,energy,Reg_mod))
     # gradient with respect to vector field
-    grad_vect_field=grad_attach_vector_field(vector_fields_list,X[0],X[1])
+    grad_vect_field=grad_attach_vector_field(X[0],X[1])
     # (1-lamb1) because of the gradient of the regularity term
 
     #GD=ComputeGD_mixt(vector_fields_list,X[0],X[1]).copy()
@@ -312,7 +355,7 @@ for k in range(niter):
             for t in range(nb_time_point_int):
                 X_temp=X.copy()
                 X_temp[1][t][i]+=deltaCont*basisCont[iter_cont]
-                GD_diff=ComputeGD_mixt(vector_fields_list,X[0],X_temp[1]).copy()
+                GD_diff=ComputeGD_list(X[0],X_temp[1]).copy()
                 temp=0
                 #print('t = {}'.format(t))
                 for s in range(nb_time_point_int):
@@ -327,7 +370,7 @@ for k in range(niter):
      
                 #ATTENTION : WE SUPPOSE THAT THE DERIVATIVE OF THE COST
                 # WITH RESPECT TO GD IS NULL
-                temp+=Module.CostGradCont(GD[t], X[1][t])[iter_cont]
+                temp+=lamb0*Module.CostGradCont(GD[t], X[1][t])[iter_cont]
                 gradCont[t][i][iter_cont]+=temp
     for i in range(NbMod):
         basisGD=ModulesList[i].basisGD.copy()
@@ -336,7 +379,7 @@ for k in range(niter):
         for iter_gd in range(dimGD):
             X_temp=X.copy()
             X_temp[0][i]+=deltaGD*basisGD[iter_gd]
-            GD_diff=ComputeGD_mixt(vector_fields_list,X_temp[0],X_temp[1]).copy()
+            GD_diff=ComputeGD_list(X_temp[0],X_temp[1]).copy()
             temp=0
             for s in range(nb_time_point_int):
                 # vec_temp is the derivative of the generated vector field at s with respect to GD[iter_cont]
@@ -353,7 +396,7 @@ for k in range(niter):
         X_temp=X.copy()
         X_temp[1]-=epsCont*gradCont.copy()
         X_temp[0]-=epsGD*gradGD
-        energy=attach_tot(vector_fields_list,X_temp[0],X_temp[1])
+        energy=attach_mod(X_temp[0],X_temp[1])
         Reg_mod=functional_mod.ComputeReg(X_temp)
         energy_mod0=Reg_mod+energy
 
@@ -426,8 +469,77 @@ for t in range(nb_time_point_int+1):
     plot_grid(grid, 5)
 #
 
+#%%
+name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_FromFile_theta_not_transported'
+
+mini=0
+maxi=1
+rec_space=template.space
+time_itvs=nb_time_point_int
+image_N0=I_t
+rec_result_1 = rec_space.element(image_N0[time_itvs // 4])
+rec_result_2 = rec_space.element(image_N0[time_itvs // 4 * 2])
+rec_result_3 = rec_space.element(image_N0[time_itvs // 4 * 3])
+rec_result = rec_space.element(image_N0[time_itvs])
+#%%
+# Plot the results of interest
+plt.figure(2, figsize=(24, 24))
+#plt.clf()
+
+plt.subplot(3, 3, 1)
+plt.imshow(np.rot90(template), cmap='bone',
+           vmin=mini,
+           vmax=maxi)
+plt.axis('off')
+#plt.savefig("/home/chchen/SwedenWork_Chong/NumericalResults_S/LDDMM_results/J_V/template_J.png", bbox_inches='tight')
+plt.colorbar()
+plt.title('Trajectory from EllipseMvt with DeformationModulesODL/deform/vect_field_ellipse')
+
+plt.subplot(3, 3, 2)
+plt.imshow(np.rot90(rec_result_1), cmap='bone',
+           vmin=mini,
+           vmax=maxi)
+
+plt.axis('off')
+plt.colorbar()
+plt.title('time_pts = {!r}'.format(time_itvs // 4))
+
+plt.subplot(3, 3, 3)
+plt.imshow(np.rot90(rec_result_2), cmap='bone',
+           vmin=mini,
+           vmax=maxi)
+#grid=grid_points[time_itvs // 4].reshape(2, rec_space.shape[0], rec_space.shape[1]).copy()
+#plot_grid(grid, 2)
+plt.axis('off')
+plt.colorbar()
+plt.title('time_pts = {!r}'.format(time_itvs // 4 * 2))
+
+plt.subplot(3, 3, 4)
+plt.imshow(np.rot90(rec_result_3), cmap='bone',
+           vmin=mini,
+           vmax=maxi)
+#grid=grid_points[time_itvs // 4*2].reshape(2, rec_space.shape[0], rec_space.shape[1]).copy()
+#plot_grid(grid, 2)
+plt.axis('off')
+plt.colorbar()
+plt.title('time_pts = {!r}'.format(time_itvs // 4 * 3))
+
+plt.subplot(3, 3, 5)
+plt.imshow(np.rot90(rec_result), cmap='bone',
+           vmin=mini,
+           vmax=maxi)
+
+plt.subplot(3, 3, 6)
+plt.imshow(np.rot90(data[0]), cmap='bone',
+           vmin=mini,
+           vmax=maxi)
+plt.axis('off')
+plt.colorbar()
+plt.title('Ground truth')
 
 
+
+plt.savefig(name, bbox_inches='tight')
 
 
 
