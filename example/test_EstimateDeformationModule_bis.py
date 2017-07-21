@@ -115,14 +115,15 @@ fac=0.3
 nb_ellipses=len(a_list)
 images_ellipses=[]
 for i in range(nb_ellipses):
-    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.0000, 0.0000, 0]]
+    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.20000, 0.0000, 0]]
     images_ellipses.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
 I0=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[0].asarray(),3))
-I1=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[nb_ellipses-1].asarray(),3))
+I1=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[2].asarray(),3))
+I2=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[4].asarray(),3))
 template=I0
 
 forward_op=odl.IdentityOperator(space)
-proj_data = forward_op(I1)
+proj_data = [forward_op(I1)] 
 
 
 space_mod = odl.uniform_discr(
@@ -134,6 +135,7 @@ NEllipse=1
 
 kernelelli=Kernel.GaussianKernel(2)
 Name='DeformationModulesODL/deform/vect_field_ellipses'
+#Name='DeformationModulesODL/deform/vect_field_ellipses_Rigid'
 update=[1,0]
 elli=FromFile.FromFile(space_mod, Name, kernelelli,update)
 #elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
@@ -147,31 +149,32 @@ GD_init=Module.GDspace.element([[[0,0],0.3*np.pi]])
 Cont_init=Module.Contspace.one()
 Cont_init=Module.Contspace.zero()
 #Module.ComputeFieldDer(GD_init, Cont_init)(GD_init)
-points=space.points()
-v0=elli.vect_field
-plt.figure()
-plt.quiver(points.T[0][::20],points.T[1][::20],v0[0][::20],v0[1][::20])
-plt.axis('equal')
-plt.title('Elli')
-
-v=Module.ComputeField(GD_init,Cont_init)
-plt.figure()
-plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
-plt.axis('equal')
-plt.title('Rotated')
-
+if False:
+    points=space.points()
+    v0=elli.vect_field
+    plt.figure()
+    plt.quiver(points.T[0][::20],points.T[1][::20],v0[0][::20],v0[1][::20])
+    plt.axis('equal')
+    plt.title('Elli')
+    
+    v=Module.ComputeField(GD_init,Cont_init)
+    plt.figure()
+    plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
+    plt.axis('equal')
+    plt.title('Rotated')
+#
 
 #%% Define functional
 lam=0.0001
 nb_time_point_int=10
 
-lamb0=1e-7
+lamb0=1e-5
 lamb1=1e-2
 import scipy
 data_time_points=np.array([1])
 data_space=odl.ProductSpace(forward_op.range,data_time_points.size)
-data=data_space.element([proj_data])
-forward_operators=[forward_op]
+data=data_space.element(proj_data)
+forward_operators=[forward_op,forward_op]
 
 
 Norm=odl.solvers.L2NormSquared(forward_op.range)
@@ -280,8 +283,8 @@ def ComputeGD_list(GD,Cont):
 
 
 #%%
-GD_init=Module.GDspace.zero()
-#GD_init=Module.GDspace.element([[0, 0]])
+#GD_init=Module.GDspace.zero()
+GD_init=Module.GDspace.element([[[3, 0],0]])
 Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
 
 niter=500
@@ -293,7 +296,7 @@ vector_fields_list_init=energy_op_lddmm.domain.zero()
 vector_fields_list=vector_fields_list_init.copy()
 #%%
 dim=2
-attachment_term=attach_tot(vector_fields_list,X[0],X[1])
+attachment_term=attach_mod(X[0],X[1])
 energy=attachment_term
 Reg_mod=functional_mod.ComputeReg(X)
 print(" Initial , attachment term : {}, reg_mod = {}".format(attachment_term,Reg_mod))
@@ -316,7 +319,7 @@ inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
 epsCont=0.01
-epsGD=0.001
+epsGD=0.01
 eps_vect_field=0.01
 cont=1
 space_pts=template.space.points()
@@ -392,7 +395,7 @@ for k in range(niter):
                 temp+=inv_N*grad_vect_field[s].inner(vec_temp_interp)
             gradGD[i]+=temp*basisGD[iter_gd]
 
-    for ite in range(10):
+    for ite in range(20):
         X_temp=X.copy()
         X_temp[1]-=epsCont*gradCont.copy()
         X_temp[0]-=epsGD*gradGD
@@ -458,19 +461,35 @@ for k in range(niter):
 
 
 I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
-
-vector_fields_list_tot=Mix_vect_field(vector_fields_list,X[0],X[1])
-grid_points=compute_grid_deformation_list(vector_fields_list_tot, 1/nb_time_point_int, template.space.points().T)
-
+#
+#vector_fields_list_tot=Mix_vect_field(vector_fields_list,X[0],X[1])
+#grid_points=compute_grid_deformation_list(vector_fields_list_tot, 1/nb_time_point_int, template.space.points().T)
+#
 for t in range(nb_time_point_int+1):
     #t=nb_time_point_int
     I_t[t].show('Mixed strategy time {}'.format(t+1))
-    grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
-    plot_grid(grid, 5)
+#    grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
+#    plot_grid(grid, 5)
 #
-
+#mini=0
+#maxi=1
+#points=I_t[0].space.points()
+#vector_field_list=vect_field_list(X[0],X[1])
+#for t in range(nb_time_point_int+1):
+#    plt.figure()
+#    v0=vector_field_list[t].copy()
+#    #plt.quiver(points.T[0][::20],points.T[1][::20],v0[0][::20],v0[1][::20],color='r')
+#    plt.axis('equal')
+#    plt.title('time {}'.format(t+1))
+#    #t=nb_time_point_int
+#    plt.imshow(I_t[t], cmap='bone',
+#           vmin=mini,
+#           vmax=maxi)
+#    #plt.quiver(points.T[0][::20],points.T[1][::20],v0[0][::20],v0[1][::20],color='r')
+#
+#GD=ComputeGD_list(X[0],X[1])
 #%%
-name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_FromFile_theta_not_transported'
+name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_FromFile_lamb0_e__5_theta_not_transported_ellipses_shifted_rotated'
 
 mini=0
 maxi=1

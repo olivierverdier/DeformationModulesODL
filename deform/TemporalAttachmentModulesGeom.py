@@ -249,9 +249,9 @@ class FunctionalModulesGeom(Functional):
                 if(self.k_j_list[contj]==self.N):
                     Cont_t=Cont[self.N]
                 else:
-                    # 'contj-1' because we need the control at self.alltimes[i-1]
-                    delta0=(self.data_time_points[contj-1] -((self.k_j_list[contj-1])/self.N))
-                    Cont_t=((1-delta0)*Cont[self.k_j_list[contj-1]] + delta0*Cont[self.k_j_list[contj-1]+1]).copy()
+                    
+                    delta0=(self.data_time_points[contj] -((self.k_j_list[contj])/self.N))
+                    Cont_t=((1-delta0)*Cont[self.k_j_list[contj]] + delta0*Cont[self.k_j_list[contj]+1]).copy()
 
 
             d_t=self.alltimes[i]-self.alltimes[i-1]

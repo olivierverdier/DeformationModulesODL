@@ -53,25 +53,46 @@ space=odl.uniform_discr(
     min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
     dtype='float32', interp='linear')
 
-
-a_list=[0.2,0.4,0.6,0.8,1]
-b_list=[1,0.8,0.6,0.4,0.2]
-c0_list=0.1*np.array([-0.5, 0.2, 0,0.3,-0.5])
-c1_list=0.1*np.array([0.1,-0.5,-0.2,0.4,0])
-theta=10*np.array([np.pi, 0.2*np.pi, -0.1*np.pi, 0.3*np.pi, 0])
-fac=0.3
-nb_ellipses=len(a_list)
-images_ellipses_source=[]
-images_ellipses_target=[]
-for i in range(nb_ellipses-1):
-    ellipses=[[1,fac* a_list[i], fac*b_list[i], c0_list[i], c1_list[i], theta[i]]]
-    images_ellipses_source.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
-    ellipses=[[1,fac* a_list[i+1], fac*b_list[i+1], c0_list[i], c1_list[i], theta[i]]]
-    images_ellipses_target.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+## For ellipse mouvement
+#a_list=[0.2,0.4,0.6,0.8,1,0.2,0.4,0.6,0.8,1]
+#b_list=[1,0.8,0.6,0.4,0.2,0.2,0.4,0.6,0.8,1]
+#c0_list=0.1*np.array([-0.5, 0.2, 0,0.3,-0.5,0,0,0.1,0.3,-0.2 ])
+#c1_list=0.1*np.array([0.1,-0.5,-0.2,0.4,0,0,0,-0.1,-0.1,0.2])
+#theta=10*np.array([np.pi, 0.2*np.pi, -0.1*np.pi, 0.3*np.pi, 0, 0, 0,0.1*np.pi,-0.2*np.pi,0])
+#fac=0.3
+#nb_ellipses=len(a_list)
+#images_ellipses_source=[]
+#images_ellipses_target=[]
+#for i in range(nb_ellipses):
+#    ellipses=[[1,fac* a_list[i], fac*(b_list[i]+0.2), c0_list[i], c1_list[i], theta[i]]]
+#    images_ellipses_source.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+#    ellipses=[[1,fac* (a_list[i]+0.2), fac*(b_list[i]), c0_list[i], c1_list[i], theta[i]]]
+#    images_ellipses_target.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
 
 #for i in range(nb_ellipses):
 #    images_ellipses_source[i].show('source {}'.format(i))
 #    images_ellipses_target[i].show('target {}'.format(i))
+
+
+# For rotation mouvement
+a_list=[0.2,0.4,0.6,0.8,1,0.2,0.4,0.6,0.8,1]
+b_list=[1,0.8,0.6,0.4,0.2,0.2,0.4,0.6,0.8,1]
+c0_list=0.1*np.array([-0.5, 0.2, 0,0.3,-0.5,0,0,0.1,0.3,-0.2 ])
+c1_list=0.1*np.array([0.1,-0.5,-0.2,0.4,0,0,0,-0.1,-0.1,0.2])
+theta=10*np.array([np.pi, 0.2*np.pi, -0.1*np.pi, 0.3*np.pi, 0, 0, 0,0.1*np.pi,-0.2*np.pi,0])
+fac=0.3
+nb_ellipses=len(a_list)
+images_ellipses_source=[]
+images_ellipses_target=[]
+for i in range(nb_ellipses):
+    ellipses=[[1,fac* a_list[i], fac*(b_list[i]+0.2), c0_list[i], c1_list[i], theta[i]]]
+    images_ellipses_source.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+    ellipses=[[1,fac* a_list[i], fac*(b_list[i]+0.2), c0_list[i], c1_list[i], theta[i]+15]]
+    images_ellipses_target.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+
+
+
+
 
 # The parameter for kernel function
 sigma = 2.0
@@ -351,7 +372,7 @@ def energyRigid_gradient(source_list, target_list,kernel, forward_op,norm, X, la
 
 forward_op = odl.IdentityOperator(space)
 
-nb_data=4
+nb_data=10
 
 source_list=[]
 target_list=[]
@@ -493,12 +514,20 @@ for n in range(nb_data):
 
 #%% Save vector field estimated
 
+np.savetxt('/home/barbara/DeformationModulesODL/deform/vect_field_rotation_Rigid',X[0])
+
 np.savetxt('/home/barbara/DeformationModulesODL/deform/vect_field_ellipses_Rigid',X[0])
    
-vect_field=space.tangent_bundle.element(np.loadtxt('/home/barbara/DeformationModulesODL/deform/vect_field_ellipses_Rigid')).copy()
+vect_field=space.tangent_bundle.element(np.loadtxt('/home/barbara/DeformationModulesODL/deform/vect_field_rotation_Rigid')).copy()
 
-
-
+import matplotlib.pyplot as plt
+points=space.points()
+v=X[0]
+v=vect_field.copy()
+plt.figure()
+plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
+plt.axis('equal')
+plt.title('Rotated')
 
 
 
