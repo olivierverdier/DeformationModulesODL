@@ -115,15 +115,29 @@ fac=0.3
 nb_ellipses=len(a_list)
 images_ellipses=[]
 for i in range(nb_ellipses):
-    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.20000, 0.0000, 0]]
+    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.00000, 0.0000, 0]]
     images_ellipses.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
 I0=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[0].asarray(),3))
 I1=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[2].asarray(),3))
 I2=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[4].asarray(),3))
 template=I0
 
-forward_op=odl.IdentityOperator(space)
-proj_data = [forward_op(I1)] 
+# Give the number of directions
+num_angles = 10
+# Create the uniformly distributed directions
+angle_partition = odl.uniform_partition(0.0, np.pi, num_angles,
+                                    nodes_on_bdry=[(True, True)])
+# Create 2-D projection domain
+# The length should be 1.5 times of that of the reconstruction space
+detector_partition = odl.uniform_partition(-24, 24, 620)
+# Create 2-D parallel projection geometry
+geometry = odl.tomo.Parallel2dGeometry(angle_partition, detector_partition)
+# Ray transform aka forward projection. We use ASTRA CUDA backend.
+forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
+
+#forward_op=odl.IdentityOperator(space)
+ground_truth=[I2]
+proj_data = [forward_op(I2)] 
 
 
 space_mod = odl.uniform_discr(
@@ -137,15 +151,15 @@ kernelelli=Kernel.GaussianKernel(2)
 Name='DeformationModulesODL/deform/vect_field_ellipses'
 #Name='DeformationModulesODL/deform/vect_field_ellipses_Rigid'
 update=[1,0]
-elli=FromFile.FromFile(space_mod, Name, kernelelli,update)
-#elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
+#elli=FromFile.FromFile(space_mod, Name, kernelelli,update)
+elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
 
 #Module=DeformationModuleAbstract.Compound([translation,rotation])
 Module=DeformationModuleAbstract.Compound([elli])
 
 #GD_init=Module.GDspace.zero()
-GD_init=Module.GDspace.element([[[0,0],0.3*np.pi]])
-#GD_init=Module.GDspace.element([[-0.2, 0.4]])
+#GD_init=Module.GDspace.element([[[0,0],0.3*np.pi]])
+GD_init=Module.GDspace.element([[-0.2, 0.4]])
 Cont_init=Module.Contspace.one()
 Cont_init=Module.Contspace.zero()
 #Module.ComputeFieldDer(GD_init, Cont_init)(GD_init)
@@ -169,7 +183,7 @@ lam=0.0001
 nb_time_point_int=10
 
 lamb0=1e-5
-lamb1=1e-2
+lamb1=1e-5
 import scipy
 data_time_points=np.array([1])
 data_space=odl.ProductSpace(forward_op.range,data_time_points.size)
@@ -269,6 +283,79 @@ def ComputeGD_list(GD,Cont):
 
     return GD_list.copy()
 #
+ 
+mini=0
+maxi=1
+rec_space=template.space
+time_itvs=nb_time_point_int
+
+
+
+def plot_result(name,image_N0):
+    rec_result_1 = rec_space.element(image_N0[time_itvs // 4])
+    rec_result_2 = rec_space.element(image_N0[time_itvs // 4 * 2])
+    rec_result_3 = rec_space.element(image_N0[time_itvs // 4 * 3])
+    rec_result = rec_space.element(image_N0[time_itvs])
+    ##%%
+    # Plot the results of interest
+    plt.figure(2, figsize=(24, 24))
+    #plt.clf()
+    
+    plt.subplot(3, 3, 1)
+    plt.imshow(np.rot90(template), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    plt.axis('off')
+    #plt.savefig("/home/chchen/SwedenWork_Chong/NumericalResults_S/LDDMM_results/J_V/template_J.png", bbox_inches='tight')
+    plt.colorbar()
+    #plt.title('Trajectory from EllipseMvt with DeformationModulesODL/deform/vect_field_ellipse')
+    
+    plt.subplot(3, 3, 2)
+    plt.imshow(np.rot90(rec_result_1), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('time_pts = {!r}'.format(time_itvs // 4))
+    
+    plt.subplot(3, 3, 3)
+    plt.imshow(np.rot90(rec_result_2), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    #grid=grid_points[time_itvs // 4].reshape(2, rec_space.shape[0], rec_space.shape[1]).copy()
+    #plot_grid(grid, 2)
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('time_pts = {!r}'.format(time_itvs // 4 * 2))
+    
+    plt.subplot(3, 3, 4)
+    plt.imshow(np.rot90(rec_result_3), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    #grid=grid_points[time_itvs // 4*2].reshape(2, rec_space.shape[0], rec_space.shape[1]).copy()
+    #plot_grid(grid, 2)
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('time_pts = {!r}'.format(time_itvs // 4 * 3))
+    
+    plt.subplot(3, 3, 5)
+    plt.imshow(np.rot90(rec_result), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    
+    plt.subplot(3, 3, 6)
+    plt.imshow(np.rot90(ground_truth[0]), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('Ground truth')
+    
+    
+    
+    plt.savefig(name, bbox_inches='tight')
+    
 
 
 #def ComputeModularVectorFields(vect_field_list,GD,Cont):
@@ -282,9 +369,43 @@ def ComputeGD_list(GD,Cont):
 
 
 
-#%%
+#%% Gradient descent LDDMM
+eps=0.1
+niter=200
+vector_fields_list_init=functional_lddmm.domain.zero()
+vector_fields_list=vector_fields_list_init.copy()
+attachment_term=energy_op_lddmm(vector_fields_list)
+print(" Initial ,  attachment term : {}".format(attachment_term))
+
+for k in range(niter):
+    grad=functional_lddmm.gradient(vector_fields_list)
+    vector_fields_list_temp= (vector_fields_list- eps *grad).copy()
+    attachment_term_temp=energy_op_lddmm(vector_fields_list_temp)
+    if(attachment_term_temp<attachment_term):
+      vector_fields_list=vector_fields_list_temp.copy()
+      attachment_term=attachment_term_temp
+      eps*=1.2
+      print(" iter : {}  ,  attachment term : {}".format(k,attachment_term))
+    else:
+      eps*=0.8
+      print(" iter : {}  ,  eps : {}".format(k,eps))
+
+    
+#
+
+
+name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_LDDMM_lamb1_e__5'
+name+= '_sigma_2_INDIRECT_num_angle_10'
+image_N0=odl.deform.ShootTemplateFromVectorFields(vector_fields_list, template)
+plot_result(name,image_N0)
+
+
+
+
+#%% Deformation module
 #GD_init=Module.GDspace.zero()
-GD_init=Module.GDspace.element([[[3, 0],0]])
+#GD_init=Module.GDspace.element([[[3, 0],0]])
+GD_init=Module.GDspace.element([[0,0]])
 Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
 
 niter=500
@@ -294,7 +415,7 @@ X=functional_mod.domain.element([GD_init,Cont_init].copy())
 
 vector_fields_list_init=energy_op_lddmm.domain.zero()
 vector_fields_list=vector_fields_list_init.copy()
-#%%
+##%%
 dim=2
 attachment_term=attach_mod(X[0],X[1])
 energy=attachment_term
@@ -319,7 +440,8 @@ inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
 epsCont=0.01
-epsGD=0.01
+epsGD=0.0
+
 eps_vect_field=0.01
 cont=1
 space_pts=template.space.points()
@@ -446,28 +568,34 @@ for k in range(niter):
            epsGD*=0.8
            epsCont*=0.8
         
-    if (ite==9):
+    if (ite==19):
         print('No possible to descent')
         break
-    #X[1]-=epsCont*gradCont.copy()
-    #    print(X[1][0])
-    #    #X[0]-=epsGD*gradGD
-    #    print([X[0]])
+
+
     print('epsGD= {} , epsCont = {}'.format(epsGD,epsCont))
     #vector_fields_list=((1-eps_vect_field*lamb1)*vector_fields_list-eps_vect_field*grad_vect_field ).copy()
 #
 
-#%%
+##%%
+#I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
+vect_field_list_mod=vect_field_list(X[0],X[1])
+I_t=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_list_mod, template)
+
+name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_EllipseMvt_lamb0_e__5'
+name+= '_sigma_2_INDIRECT_num_angle_10_initial_epsCont_0_01_fixed_GD_bis'
+image_N0=I_t
+plot_result(name,image_N0)
 
 
-I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
-#
+
+
 #vector_fields_list_tot=Mix_vect_field(vector_fields_list,X[0],X[1])
 #grid_points=compute_grid_deformation_list(vector_fields_list_tot, 1/nb_time_point_int, template.space.points().T)
 #
-for t in range(nb_time_point_int+1):
-    #t=nb_time_point_int
-    I_t[t].show('Mixed strategy time {}'.format(t+1))
+#for t in range(nb_time_point_int+1):
+#    #t=nb_time_point_int
+#    I_t[t].show('Mixed strategy time {}'.format(t+1))
 #    grid=grid_points[t].reshape(2, space.shape[0], space.shape[1]).copy()
 #    plot_grid(grid, 5)
 #
@@ -488,81 +616,11 @@ for t in range(nb_time_point_int+1):
 #    #plt.quiver(points.T[0][::20],points.T[1][::20],v0[0][::20],v0[1][::20],color='r')
 #
 #GD=ComputeGD_list(X[0],X[1])
-#%%
-name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_FromFile_lamb0_e__5_theta_not_transported_ellipses_shifted_rotated'
-
-mini=0
-maxi=1
-rec_space=template.space
-time_itvs=nb_time_point_int
-image_N0=I_t
-rec_result_1 = rec_space.element(image_N0[time_itvs // 4])
-rec_result_2 = rec_space.element(image_N0[time_itvs // 4 * 2])
-rec_result_3 = rec_space.element(image_N0[time_itvs // 4 * 3])
-rec_result = rec_space.element(image_N0[time_itvs])
-#%%
-# Plot the results of interest
-plt.figure(2, figsize=(24, 24))
-#plt.clf()
-
-plt.subplot(3, 3, 1)
-plt.imshow(np.rot90(template), cmap='bone',
-           vmin=mini,
-           vmax=maxi)
-plt.axis('off')
-#plt.savefig("/home/chchen/SwedenWork_Chong/NumericalResults_S/LDDMM_results/J_V/template_J.png", bbox_inches='tight')
-plt.colorbar()
-plt.title('Trajectory from EllipseMvt with DeformationModulesODL/deform/vect_field_ellipse')
-
-plt.subplot(3, 3, 2)
-plt.imshow(np.rot90(rec_result_1), cmap='bone',
-           vmin=mini,
-           vmax=maxi)
-
-plt.axis('off')
-plt.colorbar()
-plt.title('time_pts = {!r}'.format(time_itvs // 4))
-
-plt.subplot(3, 3, 3)
-plt.imshow(np.rot90(rec_result_2), cmap='bone',
-           vmin=mini,
-           vmax=maxi)
-#grid=grid_points[time_itvs // 4].reshape(2, rec_space.shape[0], rec_space.shape[1]).copy()
-#plot_grid(grid, 2)
-plt.axis('off')
-plt.colorbar()
-plt.title('time_pts = {!r}'.format(time_itvs // 4 * 2))
-
-plt.subplot(3, 3, 4)
-plt.imshow(np.rot90(rec_result_3), cmap='bone',
-           vmin=mini,
-           vmax=maxi)
-#grid=grid_points[time_itvs // 4*2].reshape(2, rec_space.shape[0], rec_space.shape[1]).copy()
-#plot_grid(grid, 2)
-plt.axis('off')
-plt.colorbar()
-plt.title('time_pts = {!r}'.format(time_itvs // 4 * 3))
-
-plt.subplot(3, 3, 5)
-plt.imshow(np.rot90(rec_result), cmap='bone',
-           vmin=mini,
-           vmax=maxi)
-
-plt.subplot(3, 3, 6)
-plt.imshow(np.rot90(data[0]), cmap='bone',
-           vmin=mini,
-           vmax=maxi)
-plt.axis('off')
-plt.colorbar()
-plt.title('Ground truth')
-
-
-
-plt.savefig(name, bbox_inches='tight')
+##%%
 
 
 
 
 
-
+#name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_FromFile_lamb0_e__5_theta_not_transported_ellipses_shifted_rotated'
 
