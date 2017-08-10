@@ -122,20 +122,20 @@ I1=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[2].asarra
 I2=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[4].asarray(),3))
 template=I0
 
-# Give the number of directions
-num_angles = 10
-# Create the uniformly distributed directions
-angle_partition = odl.uniform_partition(0.0, np.pi, num_angles,
-                                    nodes_on_bdry=[(True, True)])
-# Create 2-D projection domain
-# The length should be 1.5 times of that of the reconstruction space
-detector_partition = odl.uniform_partition(-24, 24, 620)
-# Create 2-D parallel projection geometry
-geometry = odl.tomo.Parallel2dGeometry(angle_partition, detector_partition)
-# Ray transform aka forward projection. We use ASTRA CUDA backend.
-forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
+## Give the number of directions
+#num_angles = 10
+## Create the uniformly distributed directions
+#angle_partition = odl.uniform_partition(0.0, np.pi, num_angles,
+#                                    nodes_on_bdry=[(True, True)])
+## Create 2-D projection domain
+## The length should be 1.5 times of that of the reconstruction space
+#detector_partition = odl.uniform_partition(-24, 24, 620)
+## Create 2-D parallel projection geometry
+#geometry = odl.tomo.Parallel2dGeometry(angle_partition, detector_partition)
+## Ray transform aka forward projection. We use ASTRA CUDA backend.
+#forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
 
-#forward_op=odl.IdentityOperator(space)
+forward_op=odl.IdentityOperator(space)
 ground_truth=[I2]
 proj_data = [forward_op(I2)] 
 
@@ -394,7 +394,7 @@ for k in range(niter):
 #
 
 
-name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_LDDMM_lamb1_e__5'
+name='/home/barbara/Results/DeformationModules/testEstimation/EstimatedTrajectory_LDDMM_lamb1_e__5'
 name+= '_sigma_2_INDIRECT_num_angle_10'
 image_N0=odl.deform.ShootTemplateFromVectorFields(vector_fields_list, template)
 plot_result(name,image_N0)
@@ -440,7 +440,7 @@ inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
 epsCont=0.01
-epsGD=0.0
+epsGD=0.01
 
 eps_vect_field=0.01
 cont=1
@@ -461,7 +461,8 @@ for k in range(niter):
     GD=ComputeGD_list(X[0],X[1]).copy()
     #print('k={}  before vect field attachment term = {}, reg_mod={}'.format(k,energy,Reg_mod))
     # gradient with respect to vector field
-    grad_vect_field=grad_attach_vector_field(X[0],X[1])
+    #grad_vect_field=grad_attach_vector_field(X[0],X[1])
+    grad_vect_field=grad_attach_vector_fieldL2(X[0],X[1])
     # (1-lamb1) because of the gradient of the regularity term
 
     #GD=ComputeGD_mixt(vector_fields_list,X[0],X[1]).copy()
@@ -534,7 +535,7 @@ for k in range(niter):
 
         X_temp=X.copy()
         X_temp[1]-=epsCont*gradCont.copy()
-        X_temp[0]=0.8*epsGD*gradGD
+        X_temp[0]-=0.8*epsGD*gradGD
         energy=attach_tot(vector_fields_list,X_temp[0],X_temp[1])
         Reg_mod=functional_mod.ComputeReg(X_temp)
         energy_mod2=Reg_mod+energy
@@ -561,6 +562,7 @@ for k in range(niter):
             X=X_temp.copy()
             energy_mod=energy_mod_temp
             print('k={} , energy = {} '.format(k,energy_mod_temp))
+            print('GD =  {}'.format(X[0]))
             epsGD*=1.2
             epsCont*=1.2
             break
@@ -577,13 +579,14 @@ for k in range(niter):
     #vector_fields_list=((1-eps_vect_field*lamb1)*vector_fields_list-eps_vect_field*grad_vect_field ).copy()
 #
 
-##%%
+#%%
 #I_t=Shoot_mixt(vector_fields_list,X[0],X[1])
 vect_field_list_mod=vect_field_list(X[0],X[1])
 I_t=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_list_mod, template)
 
-name='/home/barbara/DeformationModulesODL/example/Ellipses/EstimatedTrajectory_EllipseMvt_lamb0_e__5'
-name+= '_sigma_2_INDIRECT_num_angle_10_initial_epsCont_0_01_fixed_GD_bis'
+name='/home/barbara/Results/DeformationModules/testEstimation/Ellipses/EstimatedTrajectory_EllipseMvt_lamb0_e__5'
+#name+= '_sigma_2_INDIRECT_num_angle_10_initial_epsCont_0_01_fixed_GD'
+name+= '_sigma_2_initial_epsCont_0_01_optimized_GD'
 image_N0=I_t
 plot_result(name,image_N0)
 
