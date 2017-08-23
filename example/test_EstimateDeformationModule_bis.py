@@ -115,7 +115,7 @@ fac=0.3
 nb_ellipses=len(a_list)
 images_ellipses=[]
 for i in range(nb_ellipses):
-    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.00000, 0.0000, 0]]
+    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.30000, 0.5000, 45]]
     images_ellipses.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
 I0=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[0].asarray(),3))
 I1=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[2].asarray(),3))
@@ -151,15 +151,15 @@ kernelelli=Kernel.GaussianKernel(2)
 Name='DeformationModulesODL/deform/vect_field_ellipses'
 #Name='DeformationModulesODL/deform/vect_field_ellipses_Rigid'
 update=[1,0]
-#elli=FromFile.FromFile(space_mod, Name, kernelelli,update)
-elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
+elli=FromFile.FromFile(space_mod, Name, kernelelli,update)
+#elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
 
 #Module=DeformationModuleAbstract.Compound([translation,rotation])
 Module=DeformationModuleAbstract.Compound([elli])
 
 #GD_init=Module.GDspace.zero()
-#GD_init=Module.GDspace.element([[[0,0],0.3*np.pi]])
-GD_init=Module.GDspace.element([[-0.2, 0.4]])
+GD_init=Module.GDspace.element([[[0,0],0.3*np.pi]])
+#GD_init=Module.GDspace.element([[-0.2, 0.4]])
 Cont_init=Module.Contspace.one()
 Cont_init=Module.Contspace.zero()
 #Module.ComputeFieldDer(GD_init, Cont_init)(GD_init)
@@ -402,10 +402,13 @@ plot_result(name,image_N0)
 
 
 
-#%% Deformation module
+#%% Gradient descent Deformation module
+
+
 #GD_init=Module.GDspace.zero()
 #GD_init=Module.GDspace.element([[[3, 0],0]])
-GD_init=Module.GDspace.element([[0,0]])
+#GD_init=Module.GDspace.element([[1,-1]])
+GD_init=Module.GDspace.element([[[5,10],0]])
 Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
 
 niter=500
@@ -429,7 +432,7 @@ d_Cont=odl.ProductSpace(functional_mod.Module.Contspace,nb_time_point_int+1).zer
 ModulesList=Module.ModulesList
 NbMod=len(ModulesList)
 delta=0.1
-epsmax=1
+epsmax=2
 deltamin=0.1
 deltaCont=0.1
 deltaGD=0.2
@@ -439,8 +442,8 @@ Types=[4]
 inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
-epsCont=0.01
-epsGD=0.01
+epsCont=0.1
+epsGD=0.1
 
 eps_vect_field=0.01
 cont=1
@@ -455,6 +458,8 @@ for k in range(niter):
     gradGD=functional_mod.Module.GDspace.zero()
     gradCont=odl.ProductSpace(functional_mod.Module.Contspace,nb_time_point_int+1).zero()
 
+    if epsGD>epsmax:
+        epsGD=epsmax
     #energy=attach_tot(vector_fields_list,X[0],X[1])
     #Reg_mod=functional_mod.ComputeReg(X)
     #energy_mod=Reg_mod+energy
@@ -574,7 +579,8 @@ for k in range(niter):
         print('No possible to descent')
         break
 
-
+    if (epsCont>epsContmax):
+        epsCont=epsContmax
     print('epsGD= {} , epsCont = {}'.format(epsGD,epsCont))
     #vector_fields_list=((1-eps_vect_field*lamb1)*vector_fields_list-eps_vect_field*grad_vect_field ).copy()
 #
@@ -584,9 +590,9 @@ for k in range(niter):
 vect_field_list_mod=vect_field_list(X[0],X[1])
 I_t=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_list_mod, template)
 
-name='/home/barbara/Results/DeformationModules/testEstimation/Ellipses/EstimatedTrajectory_EllipseMvt_lamb0_e__5'
+name='/home/barbara/Results/DeformationModules/testEstimation/Ellipses/EstimatedTrajectory_FromFile_from_vect_field_ellipses_lamb0_e__5'
 #name+= '_sigma_2_INDIRECT_num_angle_10_initial_epsCont_0_01_fixed_GD'
-name+= '_sigma_2_initial_epsCont_0_01_optimized_GD'
+name+= '_sigma_2_initial_epsCont_0_01_optimized_GD_theta_not_transported_moved_ellipses'
 image_N0=I_t
 plot_result(name,image_N0)
 
