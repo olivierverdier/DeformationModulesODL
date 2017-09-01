@@ -698,7 +698,9 @@ plt.axis('equal')
 plt.title('v n {}'.format(n))
 
 #%% plot reference
+import matplotlib.pyplot as plt
 plt.figure()
+points=space.points()
 plt.quiver(points.T[0][::20],points.T[1][::20],X[0][0][::20],X[0][1][::20])
 plt.axis('equal')
 plt.title('Reference')
