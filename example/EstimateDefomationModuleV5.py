@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Created on Mon Sep  4 11:42:16 2017
+
+@author: barbara
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Created on Thu Aug 31 14:52:24 2017
 
 @author: bgris
@@ -247,15 +255,24 @@ h=1
 
 def ComputeLocTrans(c,alpha,kernel):
     #Computes the vector fields equal to the local translations centred at c, of vector alpha
-    points=space.points()
-    local=space.element([kernel([points[k][u]-c[u] for u in range(len(c))]) for k in range(len(points))])
-
-    trans=space.tangent_bundle.zero()
-    for u in range(len(alpha)):
-        trans[u]=alpha[u]
-    trans*=local.copy()
-
-    return trans.copy()
+    
+    vector_field=space.tangent_bundle.zero()
+    mg = space.meshgrid
+    kern = kernel([mgu - ou for mgu, ou in zip(mg, c)])
+    vector_field += space.tangent_bundle.element([kern * hu for hu in alpha]).copy()
+    
+    return vector_field.copy()
+#    
+#
+#    points=space.points()
+#    local=space.element([kernel([points[k][u]-c[u] for u in range(len(c))]) for k in range(len(points))])
+#
+#    trans=space.tangent_bundle.zero()
+#    for u in range(len(alpha)):
+#        trans[u]=alpha[u]
+#    trans*=local.copy()
+#
+#    return trans.copy()
 #
 
 
@@ -266,20 +283,20 @@ def ComputeLocTrans(c,alpha,kernel):
 # Besides we impose that the sum of centre is 0 and sum of vectors is (1,0)
 
 
-def ComputeVectorFieldV4(c,theta,h,xlist,alphalist,kernel):
+def ComputeVectorFieldV5(c,theta,h,xlist,alphalist,kernel):
     # (h,theta,c) is in DSE (c is a point, h and theta are scalars)
     # xlist is a list of k0-1 points (lists)
-    # alphalist is a list of k0-1 vectors (lists)
+    # alphalist is a list of k0 vectors (lists)
 
     numtrans=len(xlist)+1
 
     # we define the used centre and vectors by adding the k0-th one
-    xlist_tot=xlist.copy()
+    xlist_tot=np.array(xlist).tolist().copy()
     alphalist_tot=alphalist.copy()
 
-    alphasum=[1,0]
+    #alphasum=[1,0]
     xlist_tot.append([sum([-xlist[u][v] for u in range(numtrans-1)]) for v in range(len(c))])
-    alphalist_tot.append([alphasum[v]-sum([alphalist[u][v] for u in range(numtrans-1)]) for v in range(len(c))])
+    #alphalist_tot.append([alphasum[v]-sum([alphalist[u][v] for u in range(numtrans-1)]) for v in range(len(c))])
 
     # deform xlist and alphalist by the deformation of (h,theta,c)
     xlist_def=[]
@@ -450,7 +467,7 @@ X_init[3]=temptheta.copy()
 
 
 # The parameter for kernel function
-sigma = 2
+sigma = 1
 
 # Give kernel function
 def kernel(x):
@@ -496,11 +513,13 @@ for i in range(niter):
 
 vectorfield_list=X.copy()
 #
+vectorfield_list_save=[vectorfield_list[u].copy() for u in range(len(vectorfield_list))]
+
 #%%
 
 
 #%%
-nb_datamax=nb_data
+nb_datamax=3
 
     
 import matplotlib.pyplot as plt
@@ -536,7 +555,12 @@ for n in range(nb_datamax):
 ##vectorfield_list=[]
 #for i in range(nb_data):
 #    vect=space.tangent_bundle.zero()
-#    vectorfield_list.append(vect.copy())
+##    vectorfield_list.append(vect.copy())
+
+
+nb_data=10
+#vectorfield_list=[vectorfield_list_save[u].copy() for u in range(len(vectorfield_list_save))]
+
 tempx=[]
 tempc=[]
 tempalpha=[]
@@ -545,11 +569,18 @@ temph=[]
 for k in range(nb_data):
     temph.append(1)
     tempc.append(np.array([0.0,0.0]))
-    temptheta.append(theta_init[k]*np.pi/180)
+    temptheta.append(0*theta_init[k]*np.pi/180)
+    #temptheta.append(0)
 
 k0=3
 tempx=np.array([[0.0,-3.0],[0.0,3.0]])
-for k in range(k0-1):
+tempx=[]
+for i in range(5):
+    for j in range(7):
+        if not( (i==2) and (j==3)):
+            tempx.append(np.array([-4.0 + 2*i , -6.0+2*j]))
+k0=len(tempx)+1
+for k in range(k0):
     tempalpha.append(np.array([0.0,0.0]))
 
 X_init=[]
@@ -560,10 +591,11 @@ X_init.append(temptheta.copy())
 X_init.append(tempc.copy())
 X=X_init.copy()
 #%%
+import copy
 
-def energyV4(vectorfield_list,kernel,X):
+def energyV5(vectorfield_list,kernel,X):
     # X is a list containing (it this order) xlist which is a list of k0-1 points,
-    # alphalist which is a list of k0-1 vectors,
+    # alphalist which is a list of k0 vectors,
     # h_list which is a list of scalars
     # theta_list which is a list of angles, c_list which is a list of points
 
@@ -588,7 +620,7 @@ def energyV4(vectorfield_list,kernel,X):
 
 
     for i in range(nbdata):
-        vect_i=ComputeVectorFieldV4(clist[i],thetalist[i],hlist[i],xlist,alphalist,kernel).copy()
+        vect_i=ComputeVectorFieldV5(clist[i],thetalist[i],hlist[i],xlist,alphalist,kernel).copy()
         diff=(vectorfield_list[i] - vect_i).copy()
         diff_V=(2 * np.pi) ** (dim / 2.0) * vectorial_ft_fit_op.inverse(vectorial_ft_fit_op(diff) * ft_kernel_fitting).copy()
         energy+=diff.inner(diff_V)
@@ -597,9 +629,9 @@ def energyV4(vectorfield_list,kernel,X):
 
 
 
-def energyV4_gradient(vectorfield_list,kernel,X):
+def energyV5_gradient(vectorfield_list,kernel,X):
     # X is a list containing (it this order) xlist which is a list of k0-1 points,
-    # alphalist which is a list of k0-1 vectors,
+    # alphalist which is a list of k0 vectors,
     # h_list which is a list of scalars
     # theta_list which is a list of angles, c_list which is a list of points
 
@@ -615,9 +647,9 @@ def energyV4_gradient(vectorfield_list,kernel,X):
     xlist_tot=np.array(xlist.copy()).tolist()
     alphalist_tot=np.array(alphalist.copy()).tolist()
 
-    alphasum=[1,0]
+    #alphasum=[1,0]
     xlist_tot.append([sum([-xlist[u][v] for u in range(numtrans-1)]) for v in range(dim)])
-    alphalist_tot.append([alphasum[v]-sum([alphalist[u][v] for u in range(numtrans-1)]) for v in range(dim)])
+    #alphalist_tot.append([alphasum[v]-sum([alphalist[u][v] for u in range(numtrans-1)]) for v in range(dim)])
 
 
     gradx=np.zeros_like(xlist).tolist()
@@ -644,14 +676,14 @@ def energyV4_gradient(vectorfield_list,kernel,X):
 
     for i in range(nb_data):
 
-        vect_field_i=ComputeVectorFieldV4(clist[i],thetalist[i],hlist[i],xlist,alphalist,kernel).copy()
+        vect_field_i=ComputeVectorFieldV5(clist[i],thetalist[i],hlist[i],xlist,alphalist,kernel).copy()
 
         list_vect_field_data.append(vect_field_i.copy())
 
 
 
     for i in range(nb_data):
-        tmp=ComputeVectorFieldV4(clist[i],thetalist[i],1.0,xlist,alphalist,kernel).copy()
+        tmp=ComputeVectorFieldV5(clist[i],thetalist[i],1.0,xlist,alphalist,kernel).copy()
         tmp2=(2 * np.pi) ** (dim / 2.0) * vectorial_ft_fit_op.inverse(vectorial_ft_fit_op(tmp) * ft_kernel_fitting).copy()
 
         gradh.append(2*tmp2.inner(list_vect_field_data[i]))
@@ -669,27 +701,34 @@ def energyV4_gradient(vectorfield_list,kernel,X):
         for k in range(k0-1):
             gradx[k]+=2*np.dot(DvectiT[k],alphatransf[k]).copy()
             gradx[k]-=2*np.dot(DvectiT[k0-1],alphatransf[k0-1]).copy()
-            vect_appl_k=(vect_x[k]-vect_x[k0-1]).copy()
+            vect_appl_k=(vect_x[k]).copy()
             gradalpha[k]+=2*hlist[i]*np.array([np.cos(thetai)*vect_appl_k[0] +  np.sin(thetai)*vect_appl_k[1] , -np.sin(thetai)*vect_appl_k[0] +  np.cos(thetai)*vect_appl_k[1] ]).copy()
             gradc[i]+=2*np.dot(DvectiT[k],alphatransf[k]).copy()
-            gradtheta[i]+=2*np.dot(np.dot(DvectiT[k],alphatransf[k]),alphatransf[k]).copy()
-            alphakdeplinv=hlist[i]*np.array( [np.cos(thetai)*alphalist_tot[k][0] + np.sin(thetai)*alphalist_tot[k][1],  -np.sin(thetai)*alphalist_tot[k][0] + np.cos(thetai)*alphalist_tot[k][1]]).copy()
+            xkrotinv=np.array( [-np.sin(thetai)*xlist_tot[k][0] - np.cos(thetai)*xlist_tot[k][1],  np.cos(thetai)*xlist_tot[k][0] - np.sin(thetai)*xlist_tot[k][1]]).copy()
+            gradtheta[i]+=2*np.dot(np.dot(DvectiT[k],alphatransf[k]),xkrotinv).copy()
+            alphakdeplinv=hlist[i]*np.array( [-np.sin(thetai)*alphalist_tot[k][0] - np.cos(thetai)*alphalist_tot[k][1],  np.cos(thetai)*alphalist_tot[k][0] - np.sin(thetai)*alphalist_tot[k][1]]).copy()
             gradtheta[i]+=2*np.dot(vect_x[k],alphakdeplinv)
 
+        vect_appl_k=(vect_x[k0-1]).copy()
+        gradalpha[k0-1]+=2*hlist[i]*np.array([np.cos(thetai)*vect_appl_k[0] +  np.sin(thetai)*vect_appl_k[1] , -np.sin(thetai)*vect_appl_k[0] +  np.cos(thetai)*vect_appl_k[1] ]).copy()
+
         gradc[i]+=2*np.dot(DvectiT[k0-1],alphatransf[k0-1])
-        alphakdeplinv=hlist[i]*np.array( [np.cos(thetai)*alphalist_tot[k0-1][0] + np.sin(thetai)*alphalist_tot[k0-1][1],  -np.sin(thetai)*alphalist_tot[k0-1][0] + np.cos(thetai)*alphalist_tot[k0-1][1]]).copy()
+        xkrotinv=np.array( [-np.sin(thetai)*xlist_tot[k0-1][0] - np.cos(thetai)*xlist_tot[k0-1][1],  np.cos(thetai)*xlist_tot[k0-1][0] - np.sin(thetai)*xlist_tot[k0-1][1]]).copy()
+        gradtheta[i]+=2*np.dot(np.dot(DvectiT[k0-1],alphatransf[k0-1]),xkrotinv).copy()
+        alphakdeplinv=hlist[i]*np.array( [-np.sin(thetai)*alphalist_tot[k0-1][0] - np.cos(thetai)*alphalist_tot[k0-1][1],  np.cos(thetai)*alphalist_tot[k0-1][0] - np.sin(thetai)*alphalist_tot[k0-1][1]]).copy()
         gradtheta[i]+=2*np.dot(vect_x[k0-1],alphakdeplinv)
 
-    return [gradx,gradalpha,gradh,gradtheta,gradc]
+    return copy.deepcopy([gradx,gradalpha,gradh,gradtheta,gradc])
 
 #
 
 #%% Gradient descent
+import copy
 lamh=1e-5
 lamv=1*1e-1
 lamo=1e-5
-X=X_init.copy()
-ener=energyV4(vectorfield_list,kernel,X)
+X=copy.deepcopy(X_init)
+ener=energyV5(vectorfield_list,kernel,X)
 print('Initial energy = {}'.format(ener))
 niter=200
 eps=0.02
@@ -700,100 +739,100 @@ eps3=eps
 eps4=eps
 #%%
 print('Initial energy = {}'.format(ener))
-
+import copy
 cont=0
 for i in range(niter):
     if (cont==0):
-        grad=energyV4_gradient(vectorfield_list,kernel,X)
+        grad=energyV5_gradient(vectorfield_list,kernel,X)
 
-    X_temp=X.copy()
+    X_temp=copy.deepcopy(X)
     X_temp[0]=[np.array(X[0][uu]) - eps0*np.array(grad[0][uu]) for uu in range(len(X[0]))].copy()
     X_temp[1]=[np.array(X[1][uu]) - eps1*np.array(grad[1][uu]) for uu in range(len(X[1]))].copy()
     X_temp[2]=[X[2][uu]-eps2*grad[2][uu] for uu in range(len(X[2]))]
     X_temp[3]=[X[3][uu] - eps3*grad[3][uu] for uu in range(len(X[3]))]
     X_temp[4]=[np.array(X[4][uu]) - eps4*np.array(grad[4][uu]) for uu in range(len(X[4]))]
 
-    ener_temp=energyV4(vectorfield_list,kernel,X_temp)
+    ener_temp=energyV5(vectorfield_list,kernel,X_temp)
 
     if (ener_temp<ener):
-        X=X_temp.copy()
+        X=copy.deepcopy(X_temp)
         ener=ener_temp
-        print('Iter = {},  energy = {},  eps0={} ,  eps1={} ,  eps2={}  '.format(i,ener,eps0,eps1,eps2))
+        print('Iter = {},  energy = {},  eps0={} ,  eps1={} ,  eps2={} , eps3={} , eps4={} '.format(i,ener,eps0,eps1,eps2,eps3,eps4))
         eps0*=1.2
         eps1*=1.2
         eps2*=1.2
         eps3*=1.2
         cont=0
     else:
-        X_temp0=X.copy()
+        X_temp0=copy.deepcopy(X)
         X_temp0[0]=[np.array(X[0][uu]) - 0.5*eps0*np.array(grad[0][uu]) for uu in range(len(X[0]))].copy()
         X_temp0[1]=[np.array(X[1][uu]) - eps1*np.array(grad[1][uu]) for uu in range(len(X[1]))].copy()
         X_temp0[2]=[X[2][uu]-eps2*grad[2][uu] for uu in range(len(X[2]))]
         X_temp0[3]=[X[3][uu] - eps3*grad[3][uu] for uu in range(len(X[3]))]
         X_temp0[4]=[np.array(X[4][uu]) - eps4*np.array(grad[4][uu]) for uu in range(len(X[4]))]
-        ener_temp0=energyV4(vectorfield_list,kernel,X_temp0)
+        ener_temp0=energyV5(vectorfield_list,kernel,X_temp0)
 
-        X_temp1=X.copy()
+        X_temp1=copy.deepcopy(X)
         X_temp1[0]=[np.array(X[0][uu]) - eps0*np.array(grad[0][uu]) for uu in range(len(X[0]))].copy()
         X_temp1[1]=[np.array(X[1][uu]) - 0.5*eps1*np.array(grad[1][uu]) for uu in range(len(X[1]))].copy()
         X_temp1[2]=[X[2][uu]-eps2*grad[2][uu] for uu in range(len(X[2]))]
         X_temp1[3]=[X[3][uu] - eps3*grad[3][uu] for uu in range(len(X[3]))]
         X_temp1[4]=[np.array(X[4][uu]) - eps4*np.array(grad[4][uu]) for uu in range(len(X[4]))]
-        ener_temp1=energyV4(vectorfield_list,kernel,X_temp1)
+        ener_temp1=energyV5(vectorfield_list,kernel,X_temp1)
 
-        X_temp2=X.copy()
+        X_temp2=copy.deepcopy(X)
         X_temp2[0]=[np.array(X[0][uu]) - eps0*np.array(grad[0][uu]) for uu in range(len(X[0]))].copy()
         X_temp2[1]=[np.array(X[1][uu]) - eps1*np.array(grad[1][uu]) for uu in range(len(X[1]))].copy()
         X_temp2[2]=[X[2][uu]-0.5*eps2*grad[2][uu] for uu in range(len(X[2]))]
         X_temp2[3]=[X[3][uu] - eps3*grad[3][uu] for uu in range(len(X[3]))]
         X_temp2[4]=[np.array(X[4][uu]) - eps4*np.array(grad[4][uu]) for uu in range(len(X[4]))]
-        ener_temp2=energyV4(vectorfield_list,kernel,X_temp2)
+        ener_temp2=energyV5(vectorfield_list,kernel,X_temp2)
 
-        X_temp3=X.copy()
+        X_temp3=copy.deepcopy(X)
         X_temp3[0]=[np.array(X[0][uu]) - eps0*np.array(grad[0][uu]) for uu in range(len(X[0]))].copy()
         X_temp3[1]=[np.array(X[1][uu]) - eps1*np.array(grad[1][uu]) for uu in range(len(X[1]))].copy()
         X_temp3[2]=[X[2][uu]-eps2*grad[2][uu] for uu in range(len(X[2]))]
         X_temp3[3]=[X[3][uu] - 0.5*eps3*grad[3][uu] for uu in range(len(X[3]))]
         X_temp3[4]=[np.array(X[4][uu]) - eps4*np.array(grad[4][uu]) for uu in range(len(X[4]))]
-        ener_temp3=energyV4(vectorfield_list,kernel,X_temp3)
+        ener_temp3=energyV5(vectorfield_list,kernel,X_temp3)
 
-        X_temp4=X.copy()
+        X_temp4=copy.deepcopy(X)
         X_temp4[0]=[np.array(X[0][uu]) - eps0*np.array(grad[0][uu]) for uu in range(len(X[0]))].copy()
         X_temp4[1]=[np.array(X[1][uu]) - eps1*np.array(grad[1][uu]) for uu in range(len(X[1]))].copy()
         X_temp4[2]=[X[2][uu]-eps2*grad[2][uu] for uu in range(len(X[2]))]
         X_temp4[3]=[X[3][uu] - eps3*grad[3][uu] for uu in range(len(X[3]))]
         X_temp4[4]=[np.array(X[4][uu]) - 0.5*eps4*np.array(grad[4][uu]) for uu in range(len(X[4]))]
-        ener_temp4=energyV4(vectorfield_list,kernel,X_temp4)
+        ener_temp4=energyV5(vectorfield_list,kernel,X_temp4)
 
         if (ener_temp0 < ener_temp1 and ener_temp0 < ener_temp and ener_temp0 < ener_temp3 and ener_temp0 < ener_temp4):
-            X_temp=X_temp0.copy()
+            X_temp=copy.deepcopy(X_temp0)
             eps0*=0.5
             ener_temp=ener_temp0
         else:
             if(ener_temp1 < ener_temp0 and ener_temp1 < ener_temp2 and ener_temp1 < ener_temp3 and ener_temp1 < ener_temp4):
-                X_temp=X_temp1.copy()
+                X_temp=copy.deepcopy(X_temp1)
                 eps1*=0.5
                 ener_temp=ener_temp1
             else:
                 if(ener_temp2 < ener_temp0 and ener_temp2 < ener_temp1 and ener_temp2 < ener_temp3 and ener_temp2 < ener_temp4):
-                    X_temp=X_temp2.copy()
+                    X_temp=copy.deepcopy(X_temp2)
                     eps2*=0.5
                     ener_temp=ener_temp2
                 else:
                     if (ener_temp3 < ener_temp0 and ener_temp3 < ener_temp1 and ener_temp3 < ener_temp2 and ener_temp3 < ener_temp4):
-                        X_temp=X_temp3.copy()
+                        X_temp=copy.deepcopy(X_temp3)
                         eps3*=0.5
                         ener_temp=ener_temp3
                     else:
-                        X_temp=X_temp4.copy()
+                        X_temp=copy.deepcopy(X_temp4)
                         eps4*=0.5
                         ener_temp=ener_temp3
 
 
         if (ener_temp<ener):
-            X=X_temp.copy()
+            X=copy.deepcopy(X_temp)
             ener=ener_temp
-            print('Iter = {},  energy = {},  eps0={} ,  eps1={} ,  eps2={} , eps3={}'.format(i,ener,eps0,eps1,eps2,eps3))
+            print('Iter = {},  energy = {},  eps0={} ,  eps1={} ,  eps2={} , eps3={}, esp4={}'.format(i,ener,eps0,eps1,eps2,eps3,eps4))
             eps0*=1.2
             eps1*=1.2
             eps2*=1.2
@@ -808,9 +847,7 @@ for i in range(niter):
             eps2*=0.5
             eps3*=0.5
             eps4*=0.5
-
-
-        print('Iter = {}, eps0={} ,  eps1={} ,  eps2={} , eps3={}'.format(i,eps0,eps1,eps2,eps3))
+            print('Iter = {}, eps0={} ,  eps1={} ,  eps2={} , eps3={}, esp4={}'.format(i,eps0,eps1,eps2,eps3,eps4))
 #
 #%%
 nb_datamax=nb_data
@@ -820,7 +857,7 @@ import matplotlib.pyplot as plt
 for n in range(nb_datamax):
     #space.element(source_list[n]).show('Source {}'.format(n))
     space.element( source_list[n] - target_list[n]).show('Initial difference {}'.format(n))
-    vect_field_n=ComputeVectorFieldV4(X[4][n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
+    vect_field_n=ComputeVectorFieldV5(X[4][n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
     temp=_linear_deform(source_list[n],-vect_field_n).copy()
     (space.element(temp)-space.element(target_list[n])).show('Transported source {}'.format(n))
     #(space.element(temp)).show('Transported source {}'.format(n))
@@ -836,7 +873,7 @@ for n in range(nb_datamax):
 import matplotlib.pyplot as plt
 n=1
 source_list[n] .show('source {}'.format(n))
-vect_field_n=ComputeVectorFieldV2(X[2][n],X[3][n],X[1][n],X[0])
+vect_field_n=ComputeVectorFieldV5(X[2][n],X[3][n],X[1][n],X[0])
 temp=_linear_deform(source_list[n],-vect_field_n).copy()
 #(space.element(temp)-space.element(target_list[n])).show('Transported source {}'.format(n))
 (space.element(temp)).show('Transported source {}'.format(n))
@@ -856,20 +893,25 @@ plt.title('Reference')
 
 #%%
 
-for i in range(2):
-    X[0][i].show('{}'.format(i))
-#
+vect_field_ref=ComputeVectorFieldV5([0,0],0,1,X[0],X[1],kernel)
+v=vect_field_ref.copy()
+plt.figure()
+plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
+plt.axis('equal')
+plt.title('Reference')
 #%% Save vector field estimated
-#np.savetxt('/home/barbara/DeformationModulesODL/deform/vect_field_rotation_Rigid',X[0])
+np.savetxt('/home/barbara/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_1_k0_40',vect_field_ref)
 
-np.savetxt('/home/bgris/DeformationModulesODL/deform/vect_field_rotation_mvt_V3_sigma_2_lamv_1e__3_lamh_1e__5_lamo_1e__5',space.tangent_bundle.element(X[0]))
+#np.savetxt('/home/bgris/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_2',vect_field_ref)
 
-vect_field=space.tangent_bundle.element(np.loadtxt('/home/bgris/DeformationModulesODL/deform/vect_field_V3_sigma_2_lamv_1e__3_lamh_1e__5_lamo_1e__5')).copy()
+vect_field=space.tangent_bundle.element(np.loadtxt('/home/barbara/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_2')).copy()
+
+#vect_field=space.tangent_bundle.element(np.loadtxt('/home/bgris/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_2')).copy()
 
 import matplotlib.pyplot as plt
 points=space.points()
 #v=X[0]
-v=vectorfield_list[1].copy()
+v=vect_field.copy()
 plt.figure()
 plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
 plt.axis('equal')

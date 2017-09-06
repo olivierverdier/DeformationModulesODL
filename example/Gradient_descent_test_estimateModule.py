@@ -17,8 +17,10 @@ different step size for centre and theta
 #GD_init=Module.GDspace.zero()
 #GD_init=Module.GDspace.element([[[3, 0],0]])
 #GD_init=Module.GDspace.element([[1,-1]])
-GD_init=Module.GDspace.element([[[0,0],0]])
+#GD_init=Module.GDspace.element([[[0,0],0]])
 Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
+GD_init=Module.GDspace.element([[[0.0,0.0], 0, [0.0,0.0], [1.0,0.0]]])
+#Cont_init=Module.Contspace.zero()
 
 niter=500
 eps = 0.01
@@ -27,7 +29,7 @@ X=functional_mod.domain.element([GD_init,Cont_init].copy())
 
 vector_fields_list_init=energy_op_lddmm.domain.zero()
 vector_fields_list=vector_fields_list_init.copy()
-##%%
+#%%
 dim=2
 attachment_term=attach_mod(X[0],X[1])
 energy=attachment_term
@@ -51,10 +53,11 @@ Types=[4]
 inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
-epsCont=0.1
-epsGD_Pts=0.1
-epsGD_theta=0.1
-
+epsCont=0.01
+epsGD_Pts=0.01
+epsGD_theta=0.01
+epsGD_c=0.01
+epsGD_ab=0.01
 eps_vect_field=0.01
 cont=1
 space_pts=template.space.points()
@@ -137,66 +140,103 @@ for k in range(niter):
     for ite in range(20):
         X_temp=X.copy()
         X_temp[1]-=epsCont*gradCont.copy()
-        X_temp[0][0][0]-=epsGD_Pts*gradGD[0][0]
+        X_temp[0][0][0]-=epsGD_c*gradGD[0][0]
         X_temp[0][0][1]-=epsGD_theta*gradGD[0][1]
+        X_temp[0][0][2]-=epsGD_ab*gradGD[0][2]
+        X_temp[0][0][3]-=epsGD_ab*gradGD[0][3]
         energy=attach_mod(X_temp[0],X_temp[1])
         Reg_mod=functional_mod.ComputeReg(X_temp)
         energy_mod0=Reg_mod+energy
 
         X_temp=X.copy()
         X_temp[1]-=0.8*epsCont*gradCont.copy()
-        X_temp[0][0][0]-=epsGD_Pts*gradGD[0][0]
+        X_temp[0][0][0]-=epsGD_c*gradGD[0][0]
         X_temp[0][0][1]-=epsGD_theta*gradGD[0][1]
+        X_temp[0][0][2]-=epsGD_ab*gradGD[0][2]
+        X_temp[0][0][3]-=epsGD_ab*gradGD[0][3]
         energy=attach_tot(vector_fields_list,X_temp[0],X_temp[1])
         Reg_mod=functional_mod.ComputeReg(X_temp)
         energy_mod1=Reg_mod+energy
 
         X_temp=X.copy()
         X_temp[1]-=epsCont*gradCont.copy()
-        X_temp[0][0][0]-=0.8*epsGD_Pts*gradGD[0][0]
+        X_temp[0][0][0]-=0.8*epsGD_c*gradGD[0][0]
         X_temp[0][0][1]-=epsGD_theta*gradGD[0][1]
+        X_temp[0][0][2]-=epsGD_ab*gradGD[0][2]
+        X_temp[0][0][3]-=epsGD_ab*gradGD[0][3]
         energy=attach_tot(vector_fields_list,X_temp[0],X_temp[1])
         Reg_mod=functional_mod.ComputeReg(X_temp)
         energy_mod2=Reg_mod+energy
         
         X_temp=X.copy()
         X_temp[1]-=epsCont*gradCont.copy()
-        X_temp[0][0][0]-=epsGD_Pts*gradGD[0][0]
+        X_temp[0][0][0]-=epsGD_c*gradGD[0][0]
         X_temp[0][0][1]-=0.8*epsGD_theta*gradGD[0][1]
+        X_temp[0][0][2]-=epsGD_ab*gradGD[0][2]
+        X_temp[0][0][3]-=epsGD_ab*gradGD[0][3]
         energy=attach_mod(X_temp[0],X_temp[1])
         Reg_mod=functional_mod.ComputeReg(X_temp)
         energy_mod3=Reg_mod+energy
+                
+        X_temp=X.copy()
+        X_temp[1]-=epsCont*gradCont.copy()
+        X_temp[0][0][0]-=epsGD_c*gradGD[0][0]
+        X_temp[0][0][1]-=epsGD_theta*gradGD[0][1]
+        X_temp[0][0][2]-=0.8*epsGD_ab*gradGD[0][2]
+        X_temp[0][0][3]-=0.8*epsGD_ab*gradGD[0][3]
+        energy=attach_mod(X_temp[0],X_temp[1])
+        Reg_mod=functional_mod.ComputeReg(X_temp)
+        energy_mod4=Reg_mod+energy
 
 
 
         print('energy0 = {}, energy1 = {}, energy2 = {}, energy3 = {} '.format(energy_mod0,energy_mod1,energy_mod2,energy_mod3) )
-        if (energy_mod0 <= energy_mod1 and energy_mod0 <= energy_mod2 and energy_mod0 <= energy_mod3):
+        if (energy_mod0 <= energy_mod1 and energy_mod0 <= energy_mod2 and energy_mod0 <= energy_mod3 and energy_mod0 <= energy_mod4):
             X_temp=X.copy()
             X_temp[1]-=epsCont*gradCont.copy()
-            X_temp[0][0][0]-=epsGD_Pts*gradGD[0][0].copy()
-            X_temp[0][0][1]-=epsGD_theta*gradGD[0][1].copy()
+            X_temp[0][0][0]-=epsGD_c*gradGD[0][0]
+            X_temp[0][0][1]-=epsGD_theta*gradGD[0][1]
+            X_temp[0][0][2]-=epsGD_ab*gradGD[0][2]
+            X_temp[0][0][3]-=epsGD_ab*gradGD[0][3]
             energy_mod_temp=energy_mod0
-        elif (energy_mod1 <= energy_mod0 and energy_mod1 <= energy_mod2 and energy_mod1 <= energy_mod3):
+        elif (energy_mod1 <= energy_mod0 and energy_mod1 <= energy_mod2 and energy_mod1 <= energy_mod3 and energy_mod1 <= energy_mod4):
             X_temp=X.copy()
             X_temp[1]-=0.8*epsCont*gradCont.copy()
-            X_temp[0][0][0]-=epsGD_Pts*gradGD[0][0].copy()
-            X_temp[0][0][1]-=epsGD_theta*gradGD[0][1].copy()
+            X_temp[0][0][0]-=epsGD_c*gradGD[0][0]
+            X_temp[0][0][1]-=epsGD_theta*gradGD[0][1]
+            X_temp[0][0][2]-=epsGD_ab*gradGD[0][2]
+            X_temp[0][0][3]-=epsGD_ab*gradGD[0][3]
             energy_mod_temp=energy_mod1   
             epsCont*=0.8
-        elif (energy_mod2 <= energy_mod0 and energy_mod2 <= energy_mod1 and energy_mod2 <= energy_mod3):
+        elif (energy_mod2 <= energy_mod0 and energy_mod2 <= energy_mod1 and energy_mod2 <= energy_mod3 and energy_mod2 <= energy_mod4):
             X_temp=X.copy()
             X_temp[1]-=epsCont*gradCont.copy()
-            X_temp[0][0][0]-=0.8*epsGD_Pts*gradGD[0][0].copy()
-            X_temp[0][0][1]-=epsGD_theta*gradGD[0][1].copy()
+            X_temp[0][0][0]-=0.8*epsGD_c*gradGD[0][0]
+            X_temp[0][0][1]-=epsGD_theta*gradGD[0][1]
+            X_temp[0][0][2]-=epsGD_ab*gradGD[0][2]
+            X_temp[0][0][3]-=epsGD_ab*gradGD[0][3]
             energy_mod_temp=energy_mod2 
-            epsGD_Pts*=0.8
+            epsGD_c*=0.8
+        elif (energy_mod3 <= energy_mod0 and energy_mod3 <= energy_mod1 and energy_mod3 <= energy_mod3 and energy_mod3 <= energy_mod4):
+            X_temp=X.copy()
+            X_temp[1]-=epsCont*gradCont.copy()
+            X_temp[0][0][0]-=epsGD_c*gradGD[0][0]
+            X_temp[0][0][1]-=0.8*epsGD_theta*gradGD[0][1]
+            X_temp[0][0][2]-=epsGD_ab*gradGD[0][2]
+            X_temp[0][0][3]-=epsGD_ab*gradGD[0][3]
+            energy_mod_temp=energy_mod3
+            epsGD_theta*=0.8
         else:
             X_temp=X.copy()
             X_temp[1]-=epsCont*gradCont.copy()
-            X_temp[0][0][0]-=epsGD_Pts*gradGD[0][0].copy()
-            X_temp[0][0][1]-=0.8*epsGD_theta*gradGD[0][1].copy()
+            X_temp[0][0][0]-=epsGD_c*gradGD[0][0]
+            X_temp[0][0][1]-=epsGD_theta*gradGD[0][1]
+            X_temp[0][0][2]-=0.8*epsGD_ab*gradGD[0][2]
+            X_temp[0][0][3]-=0.8*epsGD_ab*gradGD[0][3]
             energy_mod_temp=energy_mod3
-            epsGD_theta*=0.8
+            epsGD_ab*=0.8            
+        
+        
                 
         if (energy_mod_temp < energy_mod):
             X=X_temp.copy()
@@ -204,13 +244,15 @@ for k in range(niter):
             print('k={} , energy = {} '.format(k,energy_mod_temp))
             print('GD =  {}'.format(X[0]))
             epsCont*=1.2
-            epsGD_Pts*=1.2
+            epsGD_c*=1.2
             epsGD_theta*=1.2
+            epsGD_ab*=1.2
             break
         else:
            epsCont*=0.8
-           epsGD_Pts*=0.8
+           epsGD_c*=0.8
            epsGD_theta*=0.8
+           epsGD_ab*=0.8
         
     if (ite==19):
         print('No possible to descent')
@@ -222,7 +264,7 @@ for k in range(niter):
     if epsGD_theta>epsmax:
         epsGD_theta=epsmax
         
-    print('epsGDpts= {} ,epsGDtheta= {} , epsCont = {}'.format(epsGD_Pts,epsGD_theta,epsCont))
+    print('epsGDc= {} ,epsGDtheta= {},  epsGD_ab ={}, epsCont = {}'.format(epsGD_c,epsGD_theta,epsGD_ab,epsCont))
     #vector_fields_list=((1-eps_vect_field*lamb1)*vector_fields_list-eps_vect_field*grad_vect_field ).copy()
 #
 
@@ -231,9 +273,9 @@ for k in range(niter):
 vect_field_list_mod=vect_field_list(X[0],X[1])
 I_t=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_list_mod, template)
 
-name='/home/barbara/Results/DeformationModules/testEstimation/Ellipses/EstimatedTrajectory_FromFile_from_vect_field_ellipses_lamb0_e__5'
+name='/home/barbara/Results/DeformationModules/testEstimation/Rotation/EstimatedTrajectory_FromFileV5_from_vect_field_V5'
 #name+= '_sigma_2_INDIRECT_num_angle_10_initial_epsCont_0_01_fixed_GD'
-name+= '_sigma_2_initial_epsCont_0_01_optimized_GD_well_initialized_theta_transported'
+name+= '_sigma_2_k0_3_optimized_GD'
 image_N0=I_t
 plot_result(name,image_N0)
 
