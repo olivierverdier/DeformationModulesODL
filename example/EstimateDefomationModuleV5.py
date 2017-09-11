@@ -83,23 +83,23 @@ space=odl.uniform_discr(
 #    images_ellipses_target[i].show('target {}'.format(i))
 #
 
-# For rotation mouvement
-a_list=[0.2,0.4,0.6,0.8,1,0.2,0.4,0.6,0.8,1]
-b_list=[1,0.8,0.6,0.4,0.2,0.2,0.4,0.6,0.8,1]
-c0_list=0.0*np.array([-0.5, 0.2, 0,0.3,-0.5,0,0,0.1,0.3,-0.2 ])
-c1_list=0.0*np.array([0.1,-0.5,-0.2,0.4,0,0,0,-0.1,-0.1,0.2])
-theta_init=50*np.array([0, 0.2*np.pi, -0.1*np.pi, 0.3*np.pi, 0,  -0.25*np.pi,  0.5*np.pi,0.1*np.pi,-0.2*np.pi,0])
-fac=0.3
-nb_ellipses=len(a_list)
-images_ellipses_source=[]
-images_ellipses_target=[]
-for i in range(nb_ellipses):
-    ellipses=[[1,fac* a_list[0], fac*(b_list[0]), c0_list[0], c1_list[0], theta_init[i]]]
-    images_ellipses_source.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
-    ellipses=[[1,fac* a_list[0], fac*(b_list[0]), c0_list[0], c1_list[0], theta_init[i]+10]]
-    images_ellipses_target.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
-
-
+## For rotation mouvement
+#a_list=[0.2,0.4,0.6,0.8,1,0.2,0.4,0.6,0.8,1]
+#b_list=[1,0.8,0.6,0.4,0.2,0.2,0.4,0.6,0.8,1]
+#c0_list=0.0*np.array([-0.5, 0.2, 0,0.3,-0.5,0,0,0.1,0.3,-0.2 ])
+#c1_list=0.0*np.array([0.1,-0.5,-0.2,0.4,0,0,0,-0.1,-0.1,0.2])
+#theta_init=50*np.array([0, 0.2*np.pi, -0.1*np.pi, 0.3*np.pi, 0,  -0.25*np.pi,  0.5*np.pi,0.1*np.pi,-0.2*np.pi,0])
+#fac=0.3
+#nb_ellipses=len(a_list)
+#images_ellipses_source=[]
+#images_ellipses_target=[]
+#for i in range(nb_ellipses):
+#    ellipses=[[1,fac* a_list[0], fac*(b_list[0]), c0_list[0], c1_list[0], theta_init[i]]]
+#    images_ellipses_source.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+#    ellipses=[[1,fac* a_list[0], fac*(b_list[0]), c0_list[0], c1_list[0], theta_init[i]+10]]
+#    images_ellipses_target.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+#
+#
 
 
 ## For rotation mouvement, with a fixed surrounding ellipse to force locality
@@ -430,36 +430,38 @@ def energyVectField_gradient(source_list, target_list,kernel, forward_op,norm, X
 
 forward_op = odl.IdentityOperator(space)
 
-nb_data=10
+#nb_data=10
 
 source_list=[]
 target_list=[]
 
 for i in range(nb_data):
-    source_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_source[i].copy(),1.5)))
-    target_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_target[i].copy(),1.5)))
+    #source_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_source[i].copy(),1.5)))
+    #target_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_target[i].copy(),1.5)))
+    source_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_source[i].copy(),1.5)))
+    target_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_target[i].copy(),1.5)))
 
 #source_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[3],3)))
 #target_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[4],3)))
 #%%
 norm = odl.solvers.L2NormSquared(forward_op.range)
 #import random
-X_init=[[],[],[],[],[],[]]
-nb_vect_fields=1
-
-X_init[0]=[space.zero() for uu in range(2)]
-temph=[]
-tempb=[]
-temptheta=[]
-tempd=[]
-for k in range(nb_data):
-    temph.append(1)
-    tempb.append(np.array([0.0,0.0]))
-    temptheta.append(theta_init[k]*np.pi/180)
-
-X_init[1]=temph.copy()
-X_init[2]=tempb.copy()
-X_init[3]=temptheta.copy()
+#X_init=[[],[],[],[],[],[]]
+#nb_vect_fields=1
+#
+#X_init[0]=[space.zero() for uu in range(2)]
+#temph=[]
+#tempb=[]
+#temptheta=[]
+#tempd=[]
+#for k in range(nb_data):
+#    temph.append(1)
+#    tempb.append(np.array([0.0,0.0]))
+#    temptheta.append(theta_init[k]*np.pi/180)
+#
+#X_init[1]=temph.copy()
+#X_init[2]=tempb.copy()
+#X_init[3]=temptheta.copy()
 #X_init[3]=[0.5*theta_init[u]*np.pi/180 for u in range(len(theta_init))].copy()
 
 #energy(source_list, target_list,kernel, forward_op,norm, X)
@@ -467,7 +469,7 @@ X_init[3]=temptheta.copy()
 
 
 # The parameter for kernel function
-sigma = 1
+sigma = 0.3
 
 # Give kernel function
 def kernel(x):
@@ -511,7 +513,8 @@ for i in range(niter):
         cont=1
         eps*=0.8
 
-vectorfield_list=X.copy()
+import copy
+vectorfield_list=copy.deepcopy(X)
 #
 vectorfield_list_save=[vectorfield_list[u].copy() for u in range(len(vectorfield_list))]
 
@@ -531,13 +534,47 @@ for n in range(nb_datamax):
     (space.element(temp)-space.element(target_list[n])).show('Transported source {}'.format(n))
     #(space.element(temp)).show('Transported source {}'.format(n))
     points=space.points()
-    v=vect_field_n.copy()
+    v=vectorfield_list_save[n].copy()
     plt.figure()
-    plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
+    plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20], scale=0.001)
     plt.axis('equal')
     plt.title('v n {}'.format(n))
     #vect_field_n.show('Vector field {}'.format(n))
 #
+
+#%% Centering vector fields
+# Put the centre of the mass of the norm at [0,0]
+points=space.points()
+# Padded vector fields for interpolation
+padded_size = 5 * space.shape[0]
+padded_op = ResizingOperator(space, ran_shp=[padded_size for _ in range(space.ndim)])
+padded_space=padded_op.range
+# list of images with value the square of norm of value of vecor fields
+list_norm=[]
+vectorfield_list_center=[]
+center_list=[]
+for i in range(nb_data):
+    img_norm=sum(vectorfield_list_save[i][u]**2 for u in range(2)).copy()
+    vect_field_i_padded=padded_space.tangent_bundle.element([padded_op(vectorfield_list_save[i][u]) for u in range(space.ndim)])
+    img_norm_list=np.reshape(img_norm.asarray(), points.T[0].shape).copy()
+    center=np.array([sum(img_norm_list*points.T[u]) for u in range(2)])/sum(img_norm_list)
+    points_dec=points+center
+    center_list.append(center)
+    vectorfield_list_center.append(space.tangent_bundle.element([vect_field_i_padded[u].interpolation(points_dec.T).copy() for u in range(2)]))
+
+#
+#%%
+import matplotlib.pyplot as plt
+for n in range(nb_datamax):
+    v=vectorfield_list_center[n].copy()
+    plt.figure()
+    plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
+    plt.axis('equal')
+    plt.title('v centré n {}'.format(n))
+#
+
+
+
 #%%
 #source_list=source_list[1:3]
 #target_list=target_list[1:3]
@@ -558,38 +595,6 @@ for n in range(nb_datamax):
 ##    vectorfield_list.append(vect.copy())
 
 
-nb_data=10
-#vectorfield_list=[vectorfield_list_save[u].copy() for u in range(len(vectorfield_list_save))]
-
-tempx=[]
-tempc=[]
-tempalpha=[]
-temptheta=[]
-temph=[]
-for k in range(nb_data):
-    temph.append(1)
-    tempc.append(np.array([0.0,0.0]))
-    temptheta.append(0*theta_init[k]*np.pi/180)
-    #temptheta.append(0)
-
-k0=3
-tempx=np.array([[0.0,-3.0],[0.0,3.0]])
-tempx=[]
-for i in range(5):
-    for j in range(7):
-        if not( (i==2) and (j==3)):
-            tempx.append(np.array([-4.0 + 2*i , -6.0+2*j]))
-k0=len(tempx)+1
-for k in range(k0):
-    tempalpha.append(np.array([0.0,0.0]))
-
-X_init=[]
-X_init.append(tempx.copy())
-X_init.append(tempalpha.copy())
-X_init.append(temph.copy())
-X_init.append(temptheta.copy())
-X_init.append(tempc.copy())
-X=X_init.copy()
 #%%
 import copy
 
@@ -721,8 +726,55 @@ def energyV5_gradient(vectorfield_list,kernel,X):
     return copy.deepcopy([gradx,gradalpha,gradh,gradtheta,gradc])
 
 #
+#%%
+#
+#nb_data=16
+#vectorfield_list=[vectorfield_list_save[u].copy() for u in range(len(vectorfield_list_save))]
 
+tempx=[]
+tempc=[]
+tempalpha=[]
+temptheta=[]
+temph=[]
+for k in range(nb_data):
+    temph.append(1)
+    tempc.append(np.array([0.0,0.0]))
+    #temptheta.append(0*theta_init[k]*np.pi/180)
+    temptheta.append(0.0)
+
+
+#k0=3
+minx = -3.6
+maxx=3.6
+miny=-2.0
+maxy=2.0
+
+fac=2
+#tempx=np.array([[0.0,-3.0],[0.0,3.0]])
+nbx=round((maxx-minx)/(fac*sigma)) +1
+nby=round((maxy-miny)/(fac*sigma)) +1
+
+tempx=[]
+for i in range(1,1+round(0.5*nbx)):
+    for j in range(1,1+round(0.5*nby)):
+            tempx.append(np.array([ + fac*sigma*i ,  +fac*sigma*j]))
+            tempx.append(np.array([ - fac*sigma*i ,  +fac*sigma*j]))
+            tempx.append(np.array([ + fac*sigma*i ,  -fac*sigma*j]))
+            tempx.append(np.array([ - fac*sigma*i ,  -fac*sigma*j]))
+
+k0=len(tempx)+1
+for k in range(k0):
+    tempalpha.append(np.array([0.0,0.0]))
+
+X_init=[]
+X_init.append(tempx.copy())
+X_init.append(tempalpha.copy())
+X_init.append(temph.copy())
+X_init.append(temptheta.copy())
+X_init.append(tempc.copy())
+X=X_init.copy()
 #%% Gradient descent
+vectorfield_list=copy.deepcopy(vectorfield_list_center)
 import copy
 lamh=1e-5
 lamv=1*1e-1
@@ -731,7 +783,7 @@ X=copy.deepcopy(X_init)
 ener=energyV5(vectorfield_list,kernel,X)
 print('Initial energy = {}'.format(ener))
 niter=200
-eps=0.02
+eps=0.002
 eps0=eps
 eps1=eps
 eps2=eps
@@ -850,14 +902,14 @@ for i in range(niter):
             print('Iter = {}, eps0={} ,  eps1={} ,  eps2={} , eps3={}, esp4={}'.format(i,eps0,eps1,eps2,eps3,eps4))
 #
 #%%
-nb_datamax=nb_data
+nb_datamax=2
 
     
 import matplotlib.pyplot as plt
 for n in range(nb_datamax):
     #space.element(source_list[n]).show('Source {}'.format(n))
     space.element( source_list[n] - target_list[n]).show('Initial difference {}'.format(n))
-    vect_field_n=ComputeVectorFieldV5(X[4][n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
+    vect_field_n=ComputeVectorFieldV5(X[4][n]+center_list[n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
     temp=_linear_deform(source_list[n],-vect_field_n).copy()
     (space.element(temp)-space.element(target_list[n])).show('Transported source {}'.format(n))
     #(space.element(temp)).show('Transported source {}'.format(n))
@@ -867,6 +919,44 @@ for n in range(nb_datamax):
     plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
     plt.axis('equal')
     plt.title('v n {}'.format(n))
+    #vect_field_n.show('Vector field {}'.format(n))
+#
+
+#%%
+n=4
+vect_field_n=ComputeVectorFieldV5(X[4][n]+center_list[n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
+temp=_linear_deform(source_list[n],-vect_field_n).copy()
+space.element(temp).show('transported')
+source_list[n].show('source')
+target_list[n].show('target')
+#%%
+nb_datamax=2
+
+    
+import matplotlib.pyplot as plt
+for n in range(nb_datamax):
+    #space.element(source_list[n]).show('Source {}'.format(n))
+    #space.element( source_list[n] - target_list[n]).show('Initial difference {}'.format(n))
+    vect_field_n=ComputeVectorFieldV5(X[4][n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
+    #temp=_linear_deform(source_list[n],-vect_field_n).copy()
+    #(space.element(temp)-space.element(target_list[n])).show('Transported source {}'.format(n))
+    #(space.element(temp)).show('Transported source {}'.format(n))
+    points=space.points()
+    #vect_field_n.show('vector field estimated {}'.format(n))
+    v=vectorfield_list_center[n].copy()
+    #v.show('difference {}'.format(n))
+    plt.figure()
+    plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
+    plt.axis('equal')
+    plt.title('Data{}'.format(n))
+    v=vect_field_n.copy()
+    #v.show('Estimated {}'.format(n))
+    plt.figure()
+    plt.plot(np.asarray(X[0]).T[0],np.asarray(X[0]).T[1],'xb')
+    plt.quiver(np.asarray(X[0]).T[0],np.asarray(X[0]).T[1],np.asarray(X[1]).T[0],np.asarray(X[1]).T[1])
+    #plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
+    plt.axis('equal')
+    plt.title('Estimated {}'.format(n))
     #vect_field_n.show('Vector field {}'.format(n))
 #
 #%%
@@ -900,7 +990,7 @@ plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
 plt.axis('equal')
 plt.title('Reference')
 #%% Save vector field estimated
-np.savetxt('/home/barbara/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_1_k0_40',vect_field_ref)
+np.savetxt('/home/barbara/DeformationModulesODL/deform/vect_field_rotation_SheppLogan_V5_sigma_1_k0_25',vect_field_ref)
 
 #np.savetxt('/home/bgris/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_2',vect_field_ref)
 

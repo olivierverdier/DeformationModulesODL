@@ -19,7 +19,7 @@ different step size for centre and theta
 #GD_init=Module.GDspace.element([[1,-1]])
 #GD_init=Module.GDspace.element([[[0,0],0]])
 Cont_init=odl.ProductSpace(Module.Contspace,nb_time_point_int+1).zero()
-GD_init=Module.GDspace.element([[[0.0,0.0], 0, [0.0,0.0], [1.0,0.0]]])
+GD_init=Module.GDspace.element([[[-0.77478469, -9.85281818], -0.5*np.pi, [0.0,0.0], [1.0,0.0]]])
 #Cont_init=Module.Contspace.zero()
 
 niter=500
@@ -53,12 +53,12 @@ Types=[4]
 inv_N=1/nb_time_point_int
 epsContmax=1
 epsGDmax=1
-epsCont=0.01
-epsGD_Pts=0.01
-epsGD_theta=0.01
-epsGD_c=0.01
-epsGD_ab=0.01
-eps_vect_field=0.01
+epsCont=0.1
+epsGD_Pts=0.1
+epsGD_theta=0.1
+epsGD_c=0.1
+epsGD_ab=0.1
+eps_vect_field=0.1
 cont=1
 space_pts=template.space.points()
 
@@ -273,9 +273,9 @@ for k in range(niter):
 vect_field_list_mod=vect_field_list(X[0],X[1])
 I_t=TemporalAttachmentModulesGeom.ShootTemplateFromVectorFields(vect_field_list_mod, template)
 
-name='/home/barbara/Results/DeformationModules/testEstimation/Rotation/EstimatedTrajectory_FromFileV5_from_vect_field_V5'
+name='/home/barbara/Results/DeformationModules/testEstimation/Rotation/EstimatedTrajectory_FromFileV5_from_vect_field_V5_Rotation_SheppLogan'
 #name+= '_sigma_2_INDIRECT_num_angle_10_initial_epsCont_0_01_fixed_GD'
-name+= '_sigma_2_k0_3_optimized_GD'
+name+= '_sigma_1_k0_25_optimized_GD_well_initializzed'
 image_N0=I_t
 plot_result(name,image_N0)
 

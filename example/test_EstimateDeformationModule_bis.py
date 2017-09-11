@@ -109,40 +109,40 @@ space=odl.uniform_discr(
     min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
     dtype='float32', interp='linear')
 
-
-a_list=[0.2,0.4,0.6,0.8,1]
-b_list=[1,0.8,0.6,0.4,0.2]
-fac=0.3
-nb_ellipses=len(a_list)
-images_ellipses=[]
-for i in range(nb_ellipses):
-    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.30000, 0.5000, 45]]
-    images_ellipses.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
-I0=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[0].asarray(),3))
-I1=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[2].asarray(),3))
-I2=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[4].asarray(),3))
-template=I0
-
-
-
-a_list=[0.2,0.4,0.6,0.8,1,0.2,0.4,0.6,0.8,1]
-b_list=[1,0.8,0.6,0.4,0.2,0.2,0.4,0.6,0.8,1]
-c0_list=0.0*np.array([-0.5, 0.2, 0,0.3,-0.5,0,0,0.1,0.3,-0.2 ])
-c1_list=0.0*np.array([0.1,-0.5,-0.2,0.4,0,0,0,-0.1,-0.1,0.2])
-theta_init=50*np.array([0, 0.2*np.pi, -0.1*np.pi, 0.3*np.pi, 0,  -0.25*np.pi,  0.5*np.pi,0.1*np.pi,-0.2*np.pi,0])
-fac=0.3
-nb_ellipses=len(a_list)
-images_ellipses_source=[]
-images_ellipses_target=[]
-for i in range(nb_ellipses):
-    ellipses=[[1,fac* a_list[0], fac*(b_list[0]), c0_list[0], c1_list[0], theta_init[i]]]
-    images_ellipses_source.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
-    ellipses=[[1,fac* a_list[0], fac*(b_list[0]), c0_list[0], c1_list[0], theta_init[i]+10]]
-    images_ellipses_target.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
-
-template=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_source[0].asarray(),3))
-I2=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_source[3].asarray(),3))
-
+#
+#a_list=[0.2,0.4,0.6,0.8,1]
+#b_list=[1,0.8,0.6,0.4,0.2]
+#fac=0.3
+#nb_ellipses=len(a_list)
+#images_ellipses=[]
+#for i in range(nb_ellipses):
+#    ellipses=[[1,fac* a_list[i], fac*b_list[i], 0.30000, 0.5000, 45]]
+#    images_ellipses.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+#I0=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[0].asarray(),3))
+#I1=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[2].asarray(),3))
+#I2=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[4].asarray(),3))
+#template=I0
+#
+#
+#
+#a_list=[0.2,0.4,0.6,0.8,1,0.2,0.4,0.6,0.8,1]
+#b_list=[1,0.8,0.6,0.4,0.2,0.2,0.4,0.6,0.8,1]
+#c0_list=0.0*np.array([-0.5, 0.2, 0,0.3,-0.5,0,0,0.1,0.3,-0.2 ])
+#c1_list=0.0*np.array([0.1,-0.5,-0.2,0.4,0,0,0,-0.1,-0.1,0.2])
+#theta_init=50*np.array([0, 0.2*np.pi, -0.1*np.pi, 0.3*np.pi, 0,  -0.25*np.pi,  0.5*np.pi,0.1*np.pi,-0.2*np.pi,0])
+#fac=0.3
+#nb_ellipses=len(a_list)
+#images_ellipses_source=[]
+#images_ellipses_target=[]
+#for i in range(nb_ellipses):
+#    ellipses=[[1,fac* a_list[0], fac*(b_list[0]), c0_list[0], c1_list[0], theta_init[i]]]
+#    images_ellipses_source.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+#    ellipses=[[1,fac* a_list[0], fac*(b_list[0]), c0_list[0], c1_list[0], theta_init[i]+10]]
+#    images_ellipses_target.append(odl.phantom.geometric.ellipsoid_phantom(space,ellipses).copy())
+#
+#template=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_source[0].asarray(),3))
+#I2=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_source[3].asarray(),3))
+#
 
 
 
@@ -159,6 +159,9 @@ I2=space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_source[3]
 ## Ray transform aka forward projection. We use ASTRA CUDA backend.
 #forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
 
+template=images_source[0]
+I2=images_source[5]
+
 forward_op=odl.IdentityOperator(space)
 ground_truth=[I2]
 proj_data = [forward_op(I2)] 
@@ -171,10 +174,11 @@ space_mod = odl.uniform_discr(
 ##%% Define Module
 NEllipse=1
 
-kernelelli=Kernel.GaussianKernel(2)
+kernelelli=Kernel.GaussianKernel(1)
 #Name='DeformationModulesODL/deform/vect_field_ellipses'
 #Name='/home/barbara/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_1_k0_40'
-Name='/home/barbara/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_2_k0_3'
+#Name='/home/barbara/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_2_k0_3'
+Name='/home/barbara/DeformationModulesODL/deform/vect_field_rotation_SheppLogan_V5_sigma_1_k0_25'
 #Name='DeformationModulesODL/deform/vect_field_ellipses_Rigid'
 update=[1,0]
 elli=FromFileV5.FromFileV5(space_mod, Name, kernelelli,update)
@@ -184,7 +188,7 @@ elli=FromFileV5.FromFileV5(space_mod, Name, kernelelli,update)
 Module=DeformationModuleAbstract.Compound([elli])
 
 ##%%test elli
-GD=[[0.0,0.0], -0.5*np.pi, [0.0,0.0], [0.0,1.0]]
+GD=[[0.0,0.0], -0.5*np.pi, [0.0,0.0], [1.0,0.0]]
 Cont=1
 
 #ope_der=elli.ComputeFieldDer(GD,Cont)
@@ -203,7 +207,7 @@ plt.title('Reference  1')
 
 #%%
 #GD_init=Module.GDspace.zero()
-GD_init=Module.GDspace.element([[[0.0,0.0], -0.5*np.pi, [0.0,0.0], [0.0,1.0]]])
+GD_init=Module.GDspace.element([[[-0.77478469, -9.85281818], -0.5*np.pi, [0.0,0.0], [0.0,1.0]]])
 #GD_init=Module.GDspace.element([[-0.2, 0.4]])
 Cont_init=Module.Contspace.one()
 Cont_init=Module.Contspace.zero()
@@ -243,7 +247,7 @@ functional_mod = TemporalAttachmentModulesGeom.FunctionalModulesGeom(lamb0, nb_t
 
 
 # The parameter for kernel function
-sigma = 2
+sigma = 1
 
 # Give kernel function
 def kernel_lddmm(x):
@@ -448,6 +452,7 @@ name='/home/barbara/Results/DeformationModules/testEstimation/EstimatedTrajector
 name+= '_sigma_2_INDIRECT_num_angle_10'
 image_N0=odl.deform.ShootTemplateFromVectorFields(vector_fields_list, template)
 plot_result(name,image_N0)
+
 
 
 
