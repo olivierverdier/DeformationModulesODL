@@ -31,7 +31,7 @@ import scipy
 
 # Discrete reconstruction space: discretized functions on the rectangle
 space = odl.uniform_discr(
-    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
+    min_pt=[-16, -16], max_pt=[16, 16], shape=[128,128],
     dtype='float32', interp='linear')
 
 
@@ -54,8 +54,8 @@ ellipses= [[1.50, .6900, .9200, 0.0000, 0.0000, 0],
 
 
 phantom=odl.phantom.geometric.ellipsoid_phantom(space,ellipses)
-
-template=space.element(scipy.ndimage.filters.gaussian_filter(phantom.asarray(),1.5))
+fac_smooth=0.8
+template=space.element(scipy.ndimage.filters.gaussian_filter(phantom.asarray(),fac_smooth))
 template.show()
 
 def Rtheta(theta,points):
@@ -70,7 +70,7 @@ def Rtheta(theta,points):
 
     return points_rot.T.copy()
     points.T[0]
-#    
+#
 #%%
 
 maxx=2.0
@@ -92,17 +92,17 @@ def Rot_image_cache(minx,maxx,miny,maxy,theta,centre,template):
             I1[i]=template.interpolation([[pt_rot_inv[0]+centre[0]],[pt_rot_inv[1]+centre[1]]])
         else:
             I1[i]=template[i]
-            
+
     return I1
 I1=Rot_image_cache(minx,maxx,miny,maxy,theta,centre,template)
-#I1.show()    
+#I1.show()
 
 #%%
 theta_list=[0 , 15, -20, 30, -50, 45, -10, 20, -30]
 theta_list=[0 , 10, 20, 30, 40, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180]
 theta_list=np.pi*np.array([0 , 0.1, 0.1, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9 , 1.0, 1.1, 1.2, 1.3, 1.4, 1.5])
 nb_data=len(theta_list)
-theta_dec=0.1*np.pi
+theta_dec=0.05*np.pi
 images_source=[]
 images_target=[]
 for i in range(nb_data):

@@ -64,7 +64,7 @@ def fitting_kernel(space, kernel):
 
 
 def fun_alpha(b,unit_vect,space):
-    # returns an image that associates to each point x the value <x-b , unit_vect>    
+    # returns an image that associates to each point x the value <x-b , unit_vect>
     points=space.points()
     points_dec=(points-np.array(b)).copy()
     I=space.element(sum(points_dec.T[i]*unit_vect[i] for i in range(len(unit_vect))))
@@ -72,7 +72,7 @@ def fun_alpha(b,unit_vect,space):
     return I
 
 def fun_beta(b,unit_vect,space):
-    # returns an image that associates to each point x the value <x-b , unit_vect_orth>  
+    # returns an image that associates to each point x the value <x-b , unit_vect_orth>
     points=space.points()
     unit_vect_orth=[-unit_vect[1], unit_vect[0]]
 
@@ -82,11 +82,11 @@ def fun_beta(b,unit_vect,space):
     return I
 
 
-def fun_alpha_diff(b,unit_vect,space,d_b, d_unit_vect):  
-    
+def fun_alpha_diff(b,unit_vect,space,d_b, d_unit_vect):
+
     # differential of fun_alpha
     I=space.zero()
-    
+
     prod=sum([d_b[u]*unit_vect[u] for u in range(2)])
     I=(I- prod).copy()
     I+=fun_alpha(b,d_unit_vect,space).copy()
@@ -95,8 +95,8 @@ def fun_alpha_diff(b,unit_vect,space,d_b, d_unit_vect):
 
 
 
-def fun_beta_diff(b,unit_vect,space,d_b, d_unit_vect):  
-    
+def fun_beta_diff(b,unit_vect,space,d_b, d_unit_vect):
+
     # differential of fun_beta
     I=space.zero()
     unit_vect_orth=[-unit_vect[1], unit_vect[0]]
@@ -117,15 +117,15 @@ def ComputeCenterUnitvect(o):
                     '')
     diff_ab=[(b[u]-a[u]) for u in range(len(c0))].copy()
     centre=[c0[u] + 0.5*(b[u]+a[u]) for u in range(len(c0))].copy()
-    
+
     norm_ab=np.sqrt(np.sum([diff_ab[u]**2 for u in range(len(c0))], dtype=np.float64))
     vect_unit_tmp=[diff_ab[u]/norm_ab for u in range(len(c0))].copy()
     # the unit vector is rotated with angle theta0
-    vect_unit=[vect_unit_tmp[0]*np.cos(theta0) - vect_unit_tmp[1]*np.sin(theta0) , 
+    vect_unit=[vect_unit_tmp[0]*np.cos(theta0) - vect_unit_tmp[1]*np.sin(theta0) ,
                vect_unit_tmp[0]*np.sin(theta0) + vect_unit_tmp[1]*np.cos(theta0)]
-    
-    vect_uni_orth=[-vect_unit[1],-vect_unit[0] ].copy()
-    
+
+    vect_uni_orth=[-vect_unit[1],vect_unit[0] ].copy()
+
     return copy.deepcopy([centre,vect_unit,vect_uni_orth])
 
 def fun_Rot(theta,x):
@@ -140,36 +140,36 @@ def ComputeCenterUnitvectdiff(o,d_o):
     if a==b:
         raise TypeError(' a and b are not different'
                     '')
-     
+
     d_c0=d_o[0]
     d_theta0=d_o[1][0]
     d_a=d_o[2]
     d_b=d_o[3]
-    
+
     diff_ab=[(b[u]-a[u]) for u in range(len(c0))].copy()
-    
+
     norm_ab=np.sqrt(sum([diff_ab[u]**2 for u in range(len(c0))]))
     #unit vector colin to b-a
     vect_unit_tmp=[diff_ab[u]/norm_ab for u in range(len(c0))].copy()
-    
-    
+
+
     #differential of elements defined previously
     d_diff_ab=[(d_b[u]-d_a[u]) for u in range(len(c0))].copy()
     d_centre=[d_c0[u] + 0.5*(d_b[u]+d_a[u]) for u in range(len(c0))].copy()
     #scalar product between diff_ab and d_diff_ab
     prod=sum([diff_ab[u]*d_diff_ab[u] for u in range(len(diff_ab))])
     d_vect_unit_tmp=[(d_diff_ab[u]/norm_ab) - (prod*diff_ab[u]/(norm_ab**3)) for u in  range(len(diff_ab))]
-    
+
     d_vect_unit_tmp_rot=fun_Rot(theta0,d_vect_unit_tmp)
-    
+
     theta0_der=theta0 + 0.5*np.pi
     vect_unit_tmp_rot_der_tmp=fun_Rot(theta0_der,vect_unit_tmp).copy()
     vect_unit_tmp_rot_der=[vect_unit_tmp_rot_der_tmp[u]*d_theta0 for u in range(2)]
-    
+
     d_vect_unit=[d_vect_unit_tmp_rot[u] + vect_unit_tmp_rot_der[u] for u in  range(2)]
     d_vect_unit_orth=[-d_vect_unit[1] , d_vect_unit[0] ]
-    
-    
+
+
     return copy.deepcopy([d_centre,d_vect_unit,d_vect_unit_orth])
 
 
@@ -178,12 +178,12 @@ class FromFileV5(DeformationModule):
     """
     This creates a deformation module based on a given one v defined in a file.
     The geometrical descriptor is o=(c,theta,a,b), the control is scalar so that
-    the generated vector field is zeta_o (h) = h T_{c + frac{a+b}{2} , theta + theta_{a,b}} 
+    the generated vector field is zeta_o (h) = h T_{c + frac{a+b}{2} , theta + theta_{a,b}}
     and xi_o (w) = (0,0, x(a),w(b))
     Intuitively (c,theta) defines the affine deformation between (0,e_1) defining v and
     the good direction to be transported at initial time
     """
-    
+
     def __init__(self,DomainField, Name, Kernel,update):
         """Initialize a new instance.
         DomainField : space on wich vector fields will be defined
@@ -248,20 +248,20 @@ class FromFileV5(DeformationModule):
                 a=GDspace.zero()
                 a[2+k][d]=1
                 basis.append(a.copy())
-                
+
         basisGD=basis.copy()
 
         basisCont=[Contspace.element(1)]
 
         super().__init__(GDspace,Contspace,basisGD,basisCont,DomainField)
 
-    
+
 
     def ComputeField(self, o,h):
         """Return the computed vector field on DomainField
         """
-        
-        
+
+
         if o not in self.GDspace:
             try:
                 o = self.GDspace.element(o).copy()
@@ -275,7 +275,7 @@ class FromFileV5(DeformationModule):
             except (TypeError, ValueError) as err:
                 raise TypeError(' h is not in `Contspace` instance'
                             '')
-               
+
         points=self.space.points()
         CentreVect=ComputeCenterUnitvect(o)
         centre=CentreVect[0]
@@ -283,20 +283,20 @@ class FromFileV5(DeformationModule):
         unit_vect_orth=CentreVect[2]
         alph=fun_alpha(centre,unit_vect,self.space)
         bet=fun_beta(centre,unit_vect,self.space)
-        
+
         points_ref=np.empty_like(points)
         points_ref.T[0]=np.reshape(np.asarray(alph),points.T[0].shape)
         points_ref.T[1]=np.reshape(np.asarray(bet),points.T[1].shape)
-    
-    
+
+
         # v_interp is made of the interpolation of functions of v on
         # the reference points points_depl_origin
         v_interp=[]
-    
+
         for i in range(2):
             v_interp.append(
                     self.space.element(self.vect_field_padded[i].interpolation(points_ref.T)))
-    
+
 
         vect_field_u=self.space.tangent_bundle.zero()
         vect_field_v=self.space.tangent_bundle.zero()
@@ -343,7 +343,7 @@ class FromFileV5(DeformationModule):
             def __init__(self,GD,Cont):
                 self.GD=ope.GDspace.element(GD).copy()
                 self.Cont=ope.Contspace.element(Cont).copy()[0]
-                        
+
                 points=ope.space.points()
                 [centre,unit_vect,unit_vect_orth]=ComputeCenterUnitvect(self.GD)
                 alph=fun_alpha(centre,unit_vect,ope.space)
@@ -353,25 +353,25 @@ class FromFileV5(DeformationModule):
                 self.unit_vect_orth=unit_vect_orth.copy()
                 self.alpha=alph.copy()
                 self.beta=bet.copy()
-                
+
                 points_ref=np.empty_like(points)
                 points_ref.T[0]=np.reshape(np.asarray(alph),points.T[0].shape)
                 points_ref.T[1]=np.reshape(np.asarray(bet),points.T[1].shape)
-            
-            
+
+
                 # v_interp is made of the interpolation of functions of v on
                 # the reference points points_depl_origin
                 v_interp=[]
-            
+
                 for i in range(2):
                     v_interp.append(
                             ope.space.element(ope.vect_field_padded[i].interpolation(points_ref.T)))
-    
+
                 self.v_interp=copy.deepcopy(v_interp)
                 # v_der_interp is made of the interpolation of derivatives of functions of v on
-                # the reference points points_depl_origin 
+                # the reference points points_depl_origin
                 # (v[i][j] is the differential of the i-th component of v wrt the j-th component)
-                
+
                 v_der_interp=[]
                 for i in range(2):
                     tmp=[]
@@ -379,37 +379,37 @@ class FromFileV5(DeformationModule):
                         tmp.append(
                             ope.space.element(ope.vect_field_der_padded[i][j].interpolation(points_ref.T)).copy())
                     v_der_interp.append(copy.deepcopy(tmp))
-                
-                self.v_der_interp=copy.deepcopy(v_der_interp)    
-                    
-    
+
+                self.v_der_interp=copy.deepcopy(v_der_interp)
+
+
                 super().__init__(ope.GDspace, ope.DomainField.tangent_bundle,
                                  linear=True)
-    
+
 
             def _call(self,dGD):
                 dGD=ope.GDspace.element(dGD).copy()
-                
+
                 d_var = ComputeCenterUnitvectdiff(self.GD,dGD)
                 d_centre=d_var[0]
                 d_unit_vect=d_var[1]
                 d_unit_vect_orth=d_var[2]
-                
+
                 vector_field=ope.space.tangent_bundle.zero()
                 points=ope.space.points()
                 # Differential of reference points
                 d_alpha=fun_alpha_diff(self.centre, self.unit_vect, ope.space, d_centre,d_unit_vect)
                 d_beta=fun_beta_diff(self.centre, self.unit_vect, ope.space, d_centre,d_unit_vect)
 
-                
+
                 # list of 2 images corresponding to the differentials of v_i(pts_ref)
                 d_v_ptsref =[]
                 for i in range(2):
                     im_temp=(self.v_der_interp[i][0]*d_alpha + self.v_der_interp[i][1]*d_beta).copy()
                     d_v_ptsref.append(im_temp.copy())
-                
+
                 vector_field=ope.space.tangent_bundle.zero()
-                
+
                 # we first compute the part of the derivative corresponding
                 # to the derivative of reference points
                 vector_field_temp=ope.space.tangent_bundle.zero()
@@ -417,13 +417,13 @@ class FromFileV5(DeformationModule):
                     vector_field_temp[i]+=self.unit_vect[i]
                 vector_field_temp*=d_v_ptsref[0].copy()
                 vector_field+=self.Cont*ope.space.tangent_bundle.element(vector_field_temp).copy()
-                
+
                 vector_field_temp=ope.space.tangent_bundle.zero()
                 for i in range(2):
                     vector_field_temp[i]+=self.unit_vect_orth[i]
                 vector_field_temp*=d_v_ptsref[1].copy()
                 vector_field+=self.Cont*vector_field_temp.copy()
-                
+
                 # we then compute the part of the derivative corresponding
                 # to the derivative of unit vectors
                 vector_field_temp=ope.space.tangent_bundle.zero()
@@ -431,13 +431,13 @@ class FromFileV5(DeformationModule):
                     vector_field_temp[i]+=d_unit_vect[i]
                 vector_field_temp*=self.v_interp[0].copy()
                 vector_field+=self.Cont*vector_field_temp.copy()
-                
+
                 vector_field_temp=ope.space.tangent_bundle.zero()
                 for i in range(2):
                     vector_field_temp[i]+=d_unit_vect_orth[i]
                 vector_field_temp*=self.v_interp[1].copy()
                 vector_field+=self.Cont*vector_field_temp.copy()
-                                
+
 
                 return vector_field.copy()
 
@@ -474,7 +474,7 @@ class FromFileV5(DeformationModule):
             theta0=GD[1][0]
             a=GD[2]
             b=GD[3]
-            
+
             speed=self.GDspace.zero()
             if(self.update[0]==1):
                 speed[2]=[vect_field[i].interpolation(np.array(a)) for i in range(self.dim)].copy()

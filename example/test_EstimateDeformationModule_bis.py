@@ -105,9 +105,9 @@ def plot_grid(grid, skip):
 #
 ##%%
 
-space=odl.uniform_discr(
-    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
-    dtype='float32', interp='linear')
+#space=odl.uniform_discr(
+#    min_pt=[-16, -16], max_pt=[16, 16], shape=[128,256],
+#    dtype='float32', interp='linear')
 
 #
 #a_list=[0.2,0.4,0.6,0.8,1]
@@ -160,16 +160,17 @@ space=odl.uniform_discr(
 #forward_op = odl.tomo.RayTransform(space, geometry, impl='astra_cpu')
 
 template=images_source[0]
+I1=images_source[3]
 I2=images_source[5]
-
+template.space
 forward_op=odl.IdentityOperator(space)
 ground_truth=[I2]
-proj_data = [forward_op(I2)] 
+proj_data = [forward_op(I2)]
 
 
 space_mod = odl.uniform_discr(
-    min_pt=[-20, -20], max_pt=[20, 20], shape=[256, 256],
-    dtype='float32', interp='nearest')
+    min_pt=[-16, -16], max_pt=[16, 16], shape=[128, 128],
+    dtype='float32', interp='linear')
 
 ##%% Define Module
 NEllipse=1
@@ -178,9 +179,12 @@ kernelelli=Kernel.GaussianKernel(1)
 #Name='DeformationModulesODL/deform/vect_field_ellipses'
 #Name='/home/barbara/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_1_k0_40'
 #Name='/home/barbara/DeformationModulesODL/deform/vect_field_rotation_mvt_V5_sigma_2_k0_3'
-Name='/home/barbara/DeformationModulesODL/deform/vect_field_rotation_SheppLogan_V5_sigma_1_k0_25'
+#Name='/home/barbara/DeformationModulesODL/deform/vect_field_rotation_SheppLogan_V5_sigma_1_k0_25'
+#Name='/home/bgris/DeformationModulesODL/deform/vect_field_rotation_SheppLogan_V6_sigma_1_nbtrans_16_expectedvalue'
+#Name='/home/bgris/DeformationModulesODL/deform/vect_field_rotation_SheppLogan_V6_sigma_lddmm_0_3_sigma_cp_0_3_nbtrans_32_expectedvalue'
+Name='/home/bgris/DeformationModulesODL/deform/vect_field_rotation_SheppLogan_V6_sigma_lddmm_1_sigma_cp_0_5_nbtrans_30_expectedvalue'
 #Name='DeformationModulesODL/deform/vect_field_ellipses_Rigid'
-update=[1,0]
+update=[1,1]
 elli=FromFileV5.FromFileV5(space_mod, Name, kernelelli,update)
 #elli=EllipseMvt.EllipseMvt(space_mod, Name, kernelelli)
 
@@ -219,7 +223,7 @@ if False:
     plt.quiver(points.T[0][::20],points.T[1][::20],v0[0][::20],v0[1][::20])
     plt.axis('equal')
     plt.title('Elli')
-    
+
     v=Module.ComputeField(GD_init,Cont_init)
     plt.figure()
     plt.quiver(points.T[0][::20],points.T[1][::20],v[0][::20],v[1][::20])
@@ -247,7 +251,7 @@ functional_mod = TemporalAttachmentModulesGeom.FunctionalModulesGeom(lamb0, nb_t
 
 
 # The parameter for kernel function
-sigma = 1
+sigma = 0.3
 
 # Give kernel function
 def kernel_lddmm(x):
@@ -332,7 +336,7 @@ def ComputeGD_list(GD,Cont):
 
     return GD_list.copy()
 #
- 
+
 mini=0
 maxi=1
 rec_space=template.space
@@ -350,7 +354,7 @@ def plot_result(name,image_N0):
     # Plot the results of interest
     plt.figure(2, figsize=(24, 24))
     #plt.clf()
-    
+
     plt.subplot(3, 3, 1)
     plt.imshow(np.rot90(template), cmap='bone',
                vmin=mini,
@@ -359,16 +363,16 @@ def plot_result(name,image_N0):
     #plt.savefig("/home/chchen/SwedenWork_Chong/NumericalResults_S/LDDMM_results/J_V/template_J.png", bbox_inches='tight')
     plt.colorbar()
     #plt.title('Trajectory from EllipseMvt with DeformationModulesODL/deform/vect_field_ellipse')
-    
+
     plt.subplot(3, 3, 2)
     plt.imshow(np.rot90(rec_result_1), cmap='bone',
                vmin=mini,
                vmax=maxi)
-    
+
     plt.axis('off')
     plt.colorbar()
     plt.title('time_pts = {!r}'.format(time_itvs // 4))
-    
+
     plt.subplot(3, 3, 3)
     plt.imshow(np.rot90(rec_result_2), cmap='bone',
                vmin=mini,
@@ -378,7 +382,7 @@ def plot_result(name,image_N0):
     plt.axis('off')
     plt.colorbar()
     plt.title('time_pts = {!r}'.format(time_itvs // 4 * 2))
-    
+
     plt.subplot(3, 3, 4)
     plt.imshow(np.rot90(rec_result_3), cmap='bone',
                vmin=mini,
@@ -388,16 +392,16 @@ def plot_result(name,image_N0):
     plt.axis('off')
     plt.colorbar()
     plt.title('time_pts = {!r}'.format(time_itvs // 4 * 3))
-    
+
     plt.subplot(3, 3, 5)
     plt.imshow(np.rot90(rec_result), cmap='bone',
                vmin=mini,
                vmax=maxi)
-    
+
     plt.axis('off')
     plt.colorbar()
-    plt.title('time_pts = {!r}'.format(time_itvs // 4 * 3))
-    
+    plt.title('time_pts = {!r}'.format(time_itvs ))
+
     plt.subplot(3, 3, 6)
     plt.imshow(np.rot90(ground_truth[0]), cmap='bone',
                vmin=mini,
@@ -405,11 +409,89 @@ def plot_result(name,image_N0):
     plt.axis('off')
     plt.colorbar()
     plt.title('Ground truth')
-    
-    
-    
+
+
+
     plt.savefig(name, bbox_inches='tight')
-    
+
+
+def plot_result_moduleV5(name,image_N0,GD_list):
+    plt.figure()
+    rec_result_1 = rec_space.element(image_N0[time_itvs // 4])
+    rec_result_2 = rec_space.element(image_N0[time_itvs // 4 * 2])
+    rec_result_3 = rec_space.element(image_N0[time_itvs // 4 * 3])
+    rec_result = rec_space.element(image_N0[time_itvs])
+    ##%%
+    # Plot the results of interest
+    plt.figure(2, figsize=(24, 24))
+    #plt.clf()
+
+    plt.subplot(3, 3, 1)
+    plt.imshow(np.rot90(template), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    plt.axis('off')
+    #plt.savefig("/home/chchen/SwedenWork_Chong/NumericalResults_S/LDDMM_results/J_V/template_J.png", bbox_inches='tight')
+    plt.colorbar()
+    #plt.title('Trajectory from EllipseMvt with DeformationModulesODL/deform/vect_field_ellipse')
+
+    plt.subplot(3, 3, 2)
+    plt.imshow(np.rot90(rec_result_1), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    plt.plot(GD_list[time_itvs // 4][0][2][0],GD_list[time_itvs // 4][0][2][1],'o')
+    plt.plot(GD_list[time_itvs // 4][0][3][0],GD_list[time_itvs // 4][0][3][1],'x')
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('time_pts = {!r}'.format(time_itvs // 4))
+
+    plt.subplot(3, 3, 3)
+    plt.imshow(np.rot90(rec_result_2), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    plt.plot(GD_list[time_itvs // 4 *2][0][2][0],GD_list[time_itvs // 4][0][2][1],'o')
+    plt.plot(GD_list[time_itvs // 4 *2][0][3][0],GD_list[time_itvs // 4][0][3][1],'x')
+    #grid=grid_points[time_itvs // 4].reshape(2, rec_space.shape[0], rec_space.shape[1]).copy()
+    #plot_grid(grid, 2)
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('time_pts = {!r}'.format(time_itvs // 4 * 2))
+
+    plt.subplot(3, 3, 4)
+    plt.imshow(np.rot90(rec_result_3), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    plt.plot(GD_list[time_itvs // 4 *3][0][2][0],GD_list[time_itvs // 4][0][2][1],'o')
+    plt.plot(GD_list[time_itvs // 4 *3][0][3][0],GD_list[time_itvs // 4][0][3][1],'x')
+    #grid=grid_points[time_itvs // 4*2].reshape(2, rec_space.shape[0], rec_space.shape[1]).copy()
+    #plot_grid(grid, 2)
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('time_pts = {!r}'.format(time_itvs // 4 * 3))
+
+    plt.subplot(3, 3, 5)
+    plt.imshow(np.rot90(rec_result), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    plt.plot(GD_list[time_itvs ][0][2][0],GD_list[time_itvs // 4][0][2][1],'o')
+    plt.plot(GD_list[time_itvs  ][0][3][0],GD_list[time_itvs // 4][0][3][1],'x')
+
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('time_pts = {!r}'.format(time_itvs // 4 * 3))
+
+    plt.subplot(3, 3, 6)
+    plt.imshow(np.rot90(ground_truth[0]), cmap='bone',
+               vmin=mini,
+               vmax=maxi)
+    plt.axis('off')
+    plt.colorbar()
+    plt.title('Ground truth')
+
+
+
+    plt.savefig(name, bbox_inches='tight')
+
 
 
 #def ComputeModularVectorFields(vect_field_list,GD,Cont):
@@ -444,7 +526,7 @@ for k in range(niter):
       eps*=0.8
       print(" iter : {}  ,  eps : {}".format(k,eps))
 
-    
+
 #
 
 
@@ -454,8 +536,9 @@ image_N0=odl.deform.ShootTemplateFromVectorFields(vector_fields_list, template)
 plot_result(name,image_N0)
 
 
-
-
+for i in range(nb_time_point_int):
+    vector_fields_list[i].show('{}'.format(i))
+#
 
 #%% Gradient descent Deformation module
 
@@ -547,13 +630,13 @@ for k in range(niter):
                 for s in range(nb_time_point_int):
                     # vec_temp is the derivative of the generated vector field at s with respect to h[t][iter_cont]
                     vec_temp=( Module.ComputeField(GD_diff[s], X_temp[1][s]).copy()-Module.ComputeField(GD[s], X[1][s]).copy() )/deltaCont
-                    
+
                     # It is necessary to interpolate in order to do the inner product
                     vec_temp_interp=space.tangent_bundle.element(vec_temp).copy()
-                    
+
                     temp+=inv_N*grad_vect_field[s].inner(vec_temp_interp)
                     #print('s = {}'.format(s))
-     
+
                 #ATTENTION : WE SUPPOSE THAT THE DERIVATIVE OF THE COST
                 # WITH RESPECT TO GD IS NULL
                 temp+=lamb0*Module.CostGradCont(GD[t], X[1][t])[iter_cont]
@@ -570,11 +653,11 @@ for k in range(niter):
             for s in range(nb_time_point_int):
                 # vec_temp is the derivative of the generated vector field at s with respect to GD[iter_cont]
                 vec_temp=( Module.ComputeField(GD_diff[s], X_temp[1][s]).copy()-Module.ComputeField(GD[s], X[1][s]).copy() )/deltaGD
-                 
+
                 # It is necessary to interpolate in order to do the inner product
                 vec_temp_interp=space.tangent_bundle.element(vec_temp).copy()
                         #[vec_temp[u].interpolation(space_pts.T) for u in range(dim)]).copy()
-                
+
                 temp+=inv_N*grad_vect_field[s].inner(vec_temp_interp)
             gradGD[i]+=temp*basisGD[iter_gd]
 
@@ -609,7 +692,7 @@ for k in range(niter):
             X_temp=X.copy()
             X_temp[1]-=0.8*epsCont*gradCont.copy()
             X_temp[0]-=epsGD*gradGD
-            energy_mod_temp=energy_mod1   
+            energy_mod_temp=energy_mod1
             epsCont*=0.8
         else:
             X_temp=X.copy()
@@ -617,7 +700,7 @@ for k in range(niter):
             X_temp[0]-=0.8*epsGD*gradGD
             energy_mod_temp=energy_mod2
             epsGD*=0.8
-                
+
         if (energy_mod_temp < energy_mod):
             X=X_temp.copy()
             energy_mod=energy_mod_temp
@@ -629,7 +712,7 @@ for k in range(niter):
         else:
            epsGD*=0.8
            epsCont*=0.8
-        
+
     if (ite==19):
         print('No possible to descent')
         break

@@ -249,7 +249,7 @@ class FunctionalModulesGeom(Functional):
                 if(self.k_j_list[contj]==self.N):
                     Cont_t=Cont[self.N]
                 else:
-                    
+
                     delta0=(self.data_time_points[contj] -((self.k_j_list[contj])/self.N))
                     Cont_t=((1-delta0)*Cont[self.k_j_list[contj]] + delta0*Cont[self.k_j_list[contj]+1]).copy()
 
@@ -576,3 +576,7 @@ class FunctionalModulesGeom(Functional):
                 return grad
 
         return FunctionalModulesGeomGradient()
+
+
+
+

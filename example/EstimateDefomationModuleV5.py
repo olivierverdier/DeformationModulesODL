@@ -59,7 +59,7 @@ def fitting_kernel(space, kernel):
     return discretized_kernel
 
 space=odl.uniform_discr(
-    min_pt=[-16, -16], max_pt=[16, 16], shape=[256,256],
+    min_pt=[-16, -16], max_pt=[16, 16], shape=[128,128],
     dtype='float32', interp='linear')
 #
 ## For ellipse mouvement
@@ -255,14 +255,14 @@ h=1
 
 def ComputeLocTrans(c,alpha,kernel):
     #Computes the vector fields equal to the local translations centred at c, of vector alpha
-    
+
     vector_field=space.tangent_bundle.zero()
     mg = space.meshgrid
     kern = kernel([mgu - ou for mgu, ou in zip(mg, c)])
     vector_field += space.tangent_bundle.element([kern * hu for hu in alpha]).copy()
-    
+
     return vector_field.copy()
-#    
+#
 #
 #    points=space.points()
 #    local=space.element([kernel([points[k][u]-c[u] for u in range(len(c))]) for k in range(len(points))])
@@ -434,12 +434,12 @@ forward_op = odl.IdentityOperator(space)
 
 source_list=[]
 target_list=[]
-
+fac_smooth=0.0
 for i in range(nb_data):
     #source_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_source[i].copy(),1.5)))
     #target_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses_target[i].copy(),1.5)))
-    source_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_source[i].copy(),1.5)))
-    target_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_target[i].copy(),1.5)))
+    source_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_source[i].copy(),fac_smooth)))
+    target_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_target[i].copy(),fac_smooth)))
 
 #source_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[3],3)))
 #target_list.append(space.element(scipy.ndimage.filters.gaussian_filter(images_ellipses[4],3)))
@@ -481,12 +481,12 @@ def kernel(x):
 
 #%% Gradient descent
 lamh=1e-5
-lamv=1*1e-3
+lamv=1*1e-5
 lamo=1e-5
 X=[space.tangent_bundle.zero() for u in range(len(source_list))]
 ener=energyVectField(source_list, target_list,kernel, forward_op,norm, X, lamv)
 print('Initial energy = {}'.format(ener))
-niter=200
+niter=500
 eps=0.02
 eps0=eps
 eps1=eps
@@ -524,7 +524,7 @@ vectorfield_list_save=[vectorfield_list[u].copy() for u in range(len(vectorfield
 #%%
 nb_datamax=3
 
-    
+
 import matplotlib.pyplot as plt
 for n in range(nb_datamax):
     #space.element(source_list[n]).show('Source {}'.format(n))
@@ -904,12 +904,12 @@ for i in range(niter):
 #%%
 nb_datamax=2
 
-    
+
 import matplotlib.pyplot as plt
 for n in range(nb_datamax):
     #space.element(source_list[n]).show('Source {}'.format(n))
     space.element( source_list[n] - target_list[n]).show('Initial difference {}'.format(n))
-    vect_field_n=ComputeVectorFieldV5(X[4][n]+center_list[n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
+    vect_field_n=ComputeVectorFieldV5(X[4][n]+center_list[n],X[3][n],X[2][n],X[0],X[1],kernel).copy()
     temp=_linear_deform(source_list[n],-vect_field_n).copy()
     (space.element(temp)-space.element(target_list[n])).show('Transported source {}'.format(n))
     #(space.element(temp)).show('Transported source {}'.format(n))
@@ -924,7 +924,7 @@ for n in range(nb_datamax):
 
 #%%
 n=4
-vect_field_n=ComputeVectorFieldV5(X[4][n]+center_list[n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
+vect_field_n=ComputeVectorFieldV5(X[4][n]+center_list[n],X[3][n],X[2][n],X[0],X[1],kernel).copy()
 temp=_linear_deform(source_list[n],-vect_field_n).copy()
 space.element(temp).show('transported')
 source_list[n].show('source')
@@ -932,12 +932,12 @@ target_list[n].show('target')
 #%%
 nb_datamax=2
 
-    
+
 import matplotlib.pyplot as plt
 for n in range(nb_datamax):
     #space.element(source_list[n]).show('Source {}'.format(n))
     #space.element( source_list[n] - target_list[n]).show('Initial difference {}'.format(n))
-    vect_field_n=ComputeVectorFieldV5(X[4][n],X[3][n],X[2][n],X[0],X[1],kernel).copy() 
+    vect_field_n=ComputeVectorFieldV5(X[4][n],X[3][n],X[2][n],X[0],X[1],kernel).copy()
     #temp=_linear_deform(source_list[n],-vect_field_n).copy()
     #(space.element(temp)-space.element(target_list[n])).show('Transported source {}'.format(n))
     #(space.element(temp)).show('Transported source {}'.format(n))
